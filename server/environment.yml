@@ -15,5 +15,5 @@ dependencies:
     - httpx>=0.24.0
     - numpy>=1.21.0,<2.0.0
     - torch>=2.0.0
-    - gurobi>=11.0.0
+    - scipy>=1.9.0
   # Note: cuopt-cu12 still via pip from NVIDIA PyPI when available 
