@@ -1,0 +1,6 @@
+# ROLEX Client Dependencies
+ommx>=0.0.21
+requests>=2.28.0
+httpx>=0.24.0
+click>=8.0.0
+rich>=13.0.0 

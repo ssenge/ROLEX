@@ -1,0 +1,16 @@
+# ROLEX Server Dependencies
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+pydantic>=2.0.0
+python-multipart>=0.0.6
+ommx>=0.0.21
+numpy>=1.21.0
+
+# Solvers
+gurobipy>=11.0.0
+torch>=2.0.0
+# cuopt-cu12>=25.5.0 --extra-index-url=https://pypi.nvidia.com
+
+# Testing
+pytest>=7.0.0
+httpx>=0.24.0 
