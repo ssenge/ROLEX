@@ -9,7 +9,7 @@ SERVER_DIR="$PROJECT_ROOT/server"
 PID_FILE="$PROJECT_ROOT/run/rolex_server.pid"
 
 # Default settings
-DEFAULT_PORT=8000
+DEFAULT_PORT=8080
 DEFAULT_LOG_DIR="."
 LOG_DIR="$DEFAULT_LOG_DIR"
 
@@ -26,8 +26,8 @@ show_help() {
     echo ""
     echo "Examples:"
     echo "  $0 start                            # Start server on port $DEFAULT_PORT, log in current dir"
-    echo "  $0 start 8080                       # Start server on port 8080"
-    echo "  $0 start 8000 --log-dir=/tmp        # Start server with custom log directory"
+    echo "  $0 start 8000                       # Start server on port 8000"
+    echo "  $0 start 8080 --log-dir=/tmp        # Start server with custom log directory"
     echo "  $0 stop                             # Stop the server"
     echo "  $0 status                           # Check if server is running"
 }
