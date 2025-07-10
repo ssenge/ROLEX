@@ -1,0 +1,24 @@
+name: rolex-server
+channels:
+  - conda-forge
+  - defaults
+  - gurobi
+  - pytorch
+  - nvidia
+dependencies:
+  - python=3.11
+  - pip
+  - numpy>=1.21.0,<2.0.0
+  - pip:
+    - fastapi>=0.100.0
+    - uvicorn[standard]>=0.23.0
+    - pydantic>=2.0.0
+    - python-multipart>=0.0.6
+    - ommx>=0.0.21
+    - pytest>=7.0.0
+    - httpx>=0.24.0
+  # Solvers via conda
+  - gurobi>=11.0.0
+  - pytorch>=2.0.0
+  - pytorch-cuda=12.1
+  # Note: cuopt-cu12 still via pip from NVIDIA PyPI when available 
