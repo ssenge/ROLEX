@@ -157,7 +157,7 @@ class GurobiSolver(BaseSolver):
                 obj_expr += coeff * gurobi_vars[var_id]
             obj_expr += obj_linear.constant_term
         
-        sense = GRB.MAXIMIZE if ommx_instance.sense == ommx.Sense.MAXIMIZE else GRB.MINIMIZE
+        sense = GRB.MAXIMIZE if ommx_instance.sense == ommx.Instance.MAXIMIZE else GRB.MINIMIZE
         model.setObjective(obj_expr, sense)
         
         # Solve with timing

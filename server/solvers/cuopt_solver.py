@@ -227,11 +227,11 @@ class CuOptSolver(BaseSolver):
                 # Convert OMMX constraint to cuOpt constraint
                 expr = self._convert_linear_expression(constraint.function, cuopt_vars)
                 
-                if constraint.equality == ommx.Equality.LESS_THAN_OR_EQUAL_TO_ZERO:
+                if constraint.equality == ommx.Constraint.LESS_THAN_OR_EQUAL_TO_ZERO:
                     model.add_constraint(expr <= 0, name=constraint.name)
-                elif constraint.equality == ommx.Equality.EQUAL_TO_ZERO:
+                elif constraint.equality == ommx.Constraint.EQUAL_TO_ZERO:
                     model.add_constraint(expr == 0, name=constraint.name)
-                elif constraint.equality == ommx.Equality.GREATER_THAN_OR_EQUAL_TO_ZERO:
+                elif constraint.equality == ommx.Constraint.GREATER_THAN_OR_EQUAL_TO_ZERO:
                     model.add_constraint(expr >= 0, name=constraint.name)
                 else:
                     raise ValueError(f"Unsupported constraint type: {constraint.equality}")
@@ -239,7 +239,7 @@ class CuOptSolver(BaseSolver):
             # Set objective
             obj_expr = self._convert_linear_expression(ommx_instance.objective.function, cuopt_vars)
             
-            if ommx_instance.sense == ommx.Sense.MINIMIZE:
+            if ommx_instance.sense == ommx.Instance.MINIMIZE:
                 model.set_objective(obj_expr, sense='minimize')
             else:
                 model.set_objective(obj_expr, sense='maximize')
