@@ -57,7 +57,7 @@ class GurobiSolver(BaseSolver):
             try:
                 # Get Gurobi version and license info
                 env = gp.Env()
-                info["version"] = f"{gp.version[0]}.{gp.version[1]}.{gp.version[2]}"
+                info["version"] = gp.__version__  # Use __version__ instead of version[0]
                 info["gurobi_status"] = "available"
                 
                 # Test license by creating a small model
@@ -143,9 +143,9 @@ class GurobiSolver(BaseSolver):
                 expr += linear.constant_term
             
             # Add constraint based on equality type
-            if constraint.equality == ommx.Equality.LESS_THAN_OR_EQUAL_TO_ZERO:
+            if constraint.equality == ommx.Constraint.LESS_THAN_OR_EQUAL_TO_ZERO:
                 model.addConstr(expr <= 0, constraint.name)
-            elif constraint.equality == ommx.Equality.EQUAL_TO_ZERO:
+            elif constraint.equality == ommx.Constraint.EQUAL_TO_ZERO:
                 model.addConstr(expr == 0, constraint.name)
             # Note: GreaterThanOrEqualToZero would be >= 0
         

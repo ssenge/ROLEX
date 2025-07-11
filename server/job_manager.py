@@ -13,6 +13,7 @@ import logging
 from models import JobStatus, SolverType, OptimizationResponse, JobStatusResponse
 from solvers.gurobi_solver import GurobiSolver
 from solvers.cuopt_solver import CuOptSolver
+from solvers.scipy_solver import SciPyLPSolver
 
 
 logger = logging.getLogger(__name__)
@@ -61,6 +62,7 @@ class JobManager:
         self.solvers = {
             SolverType.GUROBI: GurobiSolver(),
             SolverType.CUOPT: CuOptSolver(),
+            SolverType.SCIPY: SciPyLPSolver(),  # Basic fallback solver
             # Add more solvers here as they become available
         }
         

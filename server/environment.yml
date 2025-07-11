@@ -1,19 +1,37 @@
 name: rolex-server
 channels:
-  - conda-forge
-  - defaults
+  - gurobi           # Official Gurobi channel
+  - nvidia           # NVIDIA CUDA packages
+  - conda-forge      # Community packages (preferred for most)
+  - defaults         # Anaconda defaults
 dependencies:
-  - python=3.11
+  - python=3.12
+  
+  # Core web framework (conda available)
+  - fastapi>=0.100.0
+  - uvicorn>=0.23.0
+  - pydantic>=2.0.0
+  - python-multipart>=0.0.6
+  
+  # Scientific computing (conda available)
+  - numpy>=1.21.0,<2.0.0
+  - scipy>=1.9.0
+  - pytorch>=2.0.0
+  - cpuonly  # CPU-only PyTorch for server
+  
+  # Testing (conda available)
+  - pytest>=7.0.0
+  - httpx>=0.24.0
+  
+  # Optimization solver (conda available)
+  - gurobi>=12.0.0  # From gurobi channel
+  
+  # CUDA support (conda available)
+  - cuda-runtime>=12.0  # From nvidia channel
+  - cuda-libraries>=12.0  # From nvidia channel
+  
+  # Only pip for packages not available via conda
   - pip
   - pip:
-    - fastapi>=0.100.0
-    - uvicorn[standard]>=0.23.0
-    - pydantic>=2.0.0
-    - python-multipart>=0.0.6
-    - ommx>=0.0.21
-    - pytest>=7.0.0
-    - httpx>=0.24.0
-    - numpy>=1.21.0,<2.0.0
-    - torch>=2.0.0
-    - scipy>=1.9.0
-  # Note: cuopt-cu12 still via pip from NVIDIA PyPI when available 
+    - ommx>=0.0.21          # Not available via conda
+    # cuOpt installation handled separately due to special requirements 

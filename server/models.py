@@ -24,7 +24,8 @@ class SolverType(str, Enum):
     """Available solver types"""
     GUROBI = "gurobi"
     CPLEX = "cplex"  # Future extension
-    CUOPT = "cuopt"  # Future extension
+    CUOPT = "cuopt"  # GPU-accelerated solver
+    SCIPY = "scipy"  # Basic fallback solver
 
 
 class OptimizationRequest(BaseModel):
