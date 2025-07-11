@@ -2,6 +2,7 @@ name: rolex-server
 channels:
   - gurobi           # Official Gurobi channel
   - nvidia           # NVIDIA CUDA packages
+  - pytorch          # PyTorch with CUDA support
   - conda-forge      # Community packages (preferred for most)
   - defaults         # Anaconda defaults
 dependencies:
