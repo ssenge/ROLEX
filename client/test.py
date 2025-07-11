@@ -5,6 +5,7 @@ Updated test.py using the new ROLEX client library.
 
 import client
 import ommx.v1 as ommx
+import os
 
 def create_ommx_problem():
     """Create the same optimization problem as before."""
@@ -32,7 +33,8 @@ def main():
     ommx_instance = create_ommx_problem()
     
     # Create ROLEX client and problem
-    rolex_client = client.Client()
+    server_url = os.getenv('SERVER_URL', 'http://localhost:8000')
+    rolex_client = client.Client(server_url=server_url)
     problem = client.Problem.from_instance(ommx_instance)
     
     print(f"📋 Problem: {problem}")
