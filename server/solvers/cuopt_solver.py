@@ -357,7 +357,7 @@ class CuOptSolver(BaseSolver):
             
             # Create OMMX State from solution
             logger.info(f"Creating OMMX State with entries: {var_id_to_value}")
-            state = ommx.State.from_values(var_id_to_value)
+            state = ommx.State(var_id_to_value)
             state_bytes = state.to_bytes()
             logger.info(f"OMMX State bytes created: {len(state_bytes)} bytes")
             

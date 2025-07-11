@@ -173,7 +173,7 @@ class GurobiSolver(BaseSolver):
                 state_entries[var.id] = gurobi_vars[var.id].X
             
             logger.info(f"Creating OMMX State with entries: {state_entries}")
-            state = ommx.State.from_values(state_entries)
+            state = ommx.State(state_entries)
             state_bytes = state.to_bytes()
             logger.info(f"OMMX State bytes created: {len(state_bytes)} bytes")
             
