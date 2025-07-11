@@ -1,0 +1,49 @@
+[Unit]
+Description=ROLEX Optimization Server
+Documentation=https://github.com/ssenge/ROLEX
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User={{ rolex_user }}
+Group={{ rolex_user }}
+WorkingDirectory={{ rolex_dir }}
+
+# Environment variables
+Environment=PATH="{{ conda_dir }}/envs/{{ conda_env }}/bin:{{ conda_dir }}/bin:/usr/local/bin:/usr/bin:/bin"
+Environment=CONDA_DEFAULT_ENV={{ conda_env }}
+Environment=CONDA_PREFIX={{ conda_dir }}/envs/{{ conda_env }}
+Environment=PYTHONPATH={{ rolex_dir }}:{{ rolex_dir }}/server
+
+# Service command
+ExecStart={{ conda_dir }}/envs/{{ conda_env }}/bin/python {{ rolex_dir }}/server/server.py --port {{ rolex_port }}
+
+# Restart policy
+Restart=always
+RestartSec=10
+RestartSteps=3
+RestartMaxDelaySec=30
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# Security settings
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths={{ rolex_dir }} {{ rolex_home }}
+ProtectHome=read-only
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=rolex
+
+# Timeout settings
+TimeoutStartSec=60
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target 

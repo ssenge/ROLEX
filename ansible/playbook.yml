@@ -1,0 +1,180 @@
+---
+- name: Deploy ROLEX Optimization Server
+  hosts: rolex_servers
+  become: yes
+  vars:
+    # Default variables (can be overridden by inventory)
+    rolex_user: "ec2-user"
+    rolex_home: "/home/{{ rolex_user }}"
+    rolex_dir: "/opt/rolex"
+    conda_dir: "/opt/miniconda"
+    conda_env: "{{ conda_env_name | default('rolex-env') }}"
+    python_version: "3.11"
+    rolex_port: "{{ rolex_port | default(8000) }}"
+    rolex_repo: "{{ rolex_repo_url | default('https://github.com/ssenge/ROLEX.git') }}"
+    
+  tasks:
+    - name: Wait for system to be ready
+      wait_for_connection:
+        timeout: 300
+        
+    - name: Check if bootstrap completed
+      stat:
+        path: "{{ rolex_home }}/.rolex-bootstrap-complete"
+      register: bootstrap_complete
+      
+    - name: Fail if bootstrap not completed
+      fail:
+        msg: "Bootstrap not completed. Please ensure user-data script ran successfully."
+      when: not bootstrap_complete.stat.exists
+      
+    - name: Update system packages
+      yum:
+        name: "*"
+        state: latest
+        update_cache: yes
+        
+    - name: Install additional system packages
+      yum:
+        name:
+          - git
+          - wget
+          - curl
+          - htop
+          - tree
+          - unzip
+          - gcc
+          - gcc-c++
+          - make
+          - openssl-devel
+          - bzip2-devel
+          - libffi-devel
+          - zlib-devel
+          - sqlite-devel
+          - readline-devel
+        state: present
+        
+    - name: Ensure ROLEX directory exists
+      file:
+        path: "{{ rolex_dir }}"
+        state: directory
+        owner: "{{ rolex_user }}"
+        group: "{{ rolex_user }}"
+        mode: '0755'
+        
+    - name: Copy ROLEX code to server
+      synchronize:
+        src: "{{ playbook_dir }}/../"
+        dest: "{{ rolex_dir }}"
+        delete: yes
+        exclude:
+          - .git/
+          - __pycache__/
+          - "*.pyc"
+          - .pytest_cache/
+          - deployment.log
+          - iac/terraform.tfstate*
+          - iac/tfplan
+          - iac/.terraform/
+          - ansible/terraform_outputs.json
+      become_user: "{{ rolex_user }}"
+      
+    - name: Check if conda is available
+      stat:
+        path: "{{ conda_dir }}/bin/conda"
+      register: conda_check
+      
+    - name: Fail if conda not available
+      fail:
+        msg: "Conda not found at {{ conda_dir }}/bin/conda. Bootstrap may have failed."
+      when: not conda_check.stat.exists
+      
+    - name: Create conda environment
+      shell: |
+        source {{ conda_dir }}/bin/activate
+        conda create -n {{ conda_env }} python={{ python_version }} -y
+      args:
+        creates: "{{ conda_dir }}/envs/{{ conda_env }}"
+      become_user: "{{ rolex_user }}"
+      
+    - name: Install Python dependencies via conda
+      shell: |
+        source {{ conda_dir }}/bin/activate
+        conda activate {{ conda_env }}
+        conda install -c conda-forge numpy fastapi uvicorn pydantic python-multipart pytest httpx -y
+      become_user: "{{ rolex_user }}"
+      
+    - name: Install OMMX via pip
+      shell: |
+        source {{ conda_dir }}/bin/activate
+        conda activate {{ conda_env }}
+        pip install ommx
+      become_user: "{{ rolex_user }}"
+      
+    - name: Install Gurobi (if available)
+      shell: |
+        source {{ conda_dir }}/bin/activate
+        conda activate {{ conda_env }}
+        conda install -c gurobi gurobi -y || pip install gurobipy || true
+      become_user: "{{ rolex_user }}"
+      ignore_errors: yes
+      
+    - name: Install GPU dependencies (if GPU enabled)
+      shell: |
+        source {{ conda_dir }}/bin/activate
+        conda activate {{ conda_env }}
+        conda install pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia -y || true
+      become_user: "{{ rolex_user }}"
+      when: enable_gpu | default(false)
+      ignore_errors: yes
+      
+    - name: Configure ROLEX systemd service
+      template:
+        src: rolex.service.j2
+        dest: /etc/systemd/system/rolex.service
+        mode: '0644'
+      notify: restart rolex service
+      
+    - name: Configure firewall rules
+      firewalld:
+        port: "{{ rolex_port }}/tcp"
+        permanent: yes
+        state: enabled
+        immediate: yes
+      ignore_errors: yes
+      
+    - name: Enable and start ROLEX service
+      systemd:
+        name: rolex
+        enabled: yes
+        state: started
+        daemon_reload: yes
+        
+    - name: Wait for ROLEX service to be ready
+      uri:
+        url: "http://{{ ansible_host }}:{{ rolex_port }}/health"
+        method: GET
+        timeout: 10
+      register: health_check
+      until: health_check.status == 200
+      retries: 30
+      delay: 10
+      
+    - name: Display deployment summary
+      debug:
+        msg: |
+          🎉 ROLEX Deployment Complete!
+          ================================
+          🌐 Server URL: http://{{ ansible_host }}:{{ rolex_port }}
+          🔍 Health Check: http://{{ ansible_host }}:{{ rolex_port }}/health
+          🔧 SSH Command: ssh -i ~/.ssh/id_rsa ec2-user@{{ ansible_host }}
+          📁 Installation Path: {{ rolex_dir }}
+          🐍 Conda Environment: {{ conda_env }}
+          💻 Instance Type: {{ ansible_facts.get('ec2_instance_type', 'Unknown') }}
+          
+  handlers:
+    - name: restart rolex service
+      systemd:
+        name: rolex
+        state: restarted
+        daemon_reload: yes 

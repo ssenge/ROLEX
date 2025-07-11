@@ -1,17 +1,36 @@
 #!/bin/bash
 
-# ROLEX Server Management Script
+# ROLEX Server Management Script with Conda Environment Support
 # Usage: ./rolex_server.sh [start|stop] [port] [--log-dir=path]
 
+# Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 SERVER_DIR="$PROJECT_ROOT/server"
 PID_FILE="$PROJECT_ROOT/run/rolex_server.pid"
 
 # Default settings
-DEFAULT_PORT=8080
+DEFAULT_PORT=8000
 DEFAULT_LOG_DIR="."
 LOG_DIR="$DEFAULT_LOG_DIR"
+CONDA_ENV_NAME="rolex-server"
+CONDA_PATH="/opt/homebrew/anaconda3"
+
+# Check if conda is available and environment exists
+check_conda_env() {
+    if ! command -v conda &> /dev/null; then
+        echo "⚠️  Conda not found. Make sure conda is installed and in PATH."
+        return 1
+    fi
+    
+    if ! conda info --envs | grep -q "$CONDA_ENV_NAME"; then
+        echo "⚠️  Conda environment '$CONDA_ENV_NAME' not found."
+        echo "   Please create it with: conda create -n $CONDA_ENV_NAME python=3.11 -y"
+        return 1
+    fi
+    
+    return 0
+}
 
 show_help() {
     echo "ROLEX Server Management Script"
@@ -30,11 +49,18 @@ show_help() {
     echo "  $0 start 8080 --log-dir=/tmp        # Start server with custom log directory"
     echo "  $0 stop                             # Stop the server"
     echo "  $0 status                           # Check if server is running"
+    echo ""
+    echo "Requirements:"
+    echo "  - Conda environment '$CONDA_ENV_NAME' must be available"
+    echo "  - Python 3.11+ with required packages installed"
 }
 
-
-
 start_server() {
+    # Check conda environment first
+    if ! check_conda_env; then
+        return 1
+    fi
+    
     # Parse arguments for --log-dir
     local args=("$@")
     local port
@@ -107,27 +133,54 @@ start_server() {
         return 1
     fi
     
-    # Start the server
+    # Start the server with conda environment
     echo "🚀 Starting ROLEX server on port $port..."
+    echo "🐍 Using conda environment: $CONDA_ENV_NAME"
     cd "$SERVER_DIR"
     
-    # Start server with proper command-line arguments
-    nohup python server.py --port "$port" > "$LOG_FILE" 2>&1 &
+    # Start server with conda environment activation
+    nohup bash -c "
+        # Set up paths explicitly for conda
+        export PATH='${CONDA_PATH}/bin:\$PATH'
+        
+        # Source conda setup
+        if [ -f ~/.bashrc ]; then
+            source ~/.bashrc
+        fi
+        
+        # Activate conda environment
+        conda activate $CONDA_ENV_NAME || {
+            echo 'Failed to activate conda environment $CONDA_ENV_NAME' >&2
+            exit 1
+        }
+        
+        # Change to server directory and start
+        cd '$SERVER_DIR' || {
+            echo 'Failed to change to server directory $SERVER_DIR' >&2
+            exit 1
+        }
+        
+        # Start the server
+        exec python server.py --port $port
+    " > "$LOG_FILE" 2>&1 &
     
     local pid=$!
     echo $pid > "$PID_FILE"
     
     # Wait a moment and check if server started successfully
-    sleep 2
+    sleep 3
     if ps -p $pid > /dev/null 2>&1; then
         echo "✅ ROLEX server started successfully (PID: $pid)"
         echo "   Server URL: http://localhost:$port"
         echo "   API Docs: http://localhost:$port/docs"
         echo "   Health: http://localhost:$port/health"
         echo "   Log file: $LOG_FILE"
+        echo "   Conda environment: $CONDA_ENV_NAME"
     else
         echo "❌ Failed to start ROLEX server"
         echo "   Check log file: $LOG_FILE"
+        echo "   Last 10 lines of log:"
+        tail -10 "$LOG_FILE" 2>/dev/null || echo "   No log content available"
         rm -f "$PID_FILE"
         return 1
     fi

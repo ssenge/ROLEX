@@ -630,7 +630,12 @@ class Result:
         Returns:
             New result instance
         """
-        ommx_state_bytes = bytes(server_result.get('ommx_state_bytes', []))
+        # Handle the case where ommx_state_bytes might be None
+        ommx_state_bytes_raw = server_result.get('ommx_state_bytes', [])
+        if ommx_state_bytes_raw is None:
+            ommx_state_bytes = b''
+        else:
+            ommx_state_bytes = bytes(ommx_state_bytes_raw)
         
         return cls(
             status=server_result.get('status', 'unknown'),
