@@ -143,9 +143,9 @@ start_server() {
         # Set up paths explicitly for conda
         export PATH='${CONDA_PATH}/condabin:\$PATH'
         
-        # Source conda setup
-        if [ -f ~/.bashrc ]; then
-            source ~/.bashrc
+        # Source conda setup explicitly
+        if [ -f '${CONDA_PATH}/etc/profile.d/conda.sh' ]; then
+            source '${CONDA_PATH}/etc/profile.d/conda.sh'
         fi
         
         # Activate conda environment
