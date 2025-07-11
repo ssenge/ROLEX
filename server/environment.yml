@@ -34,4 +34,4 @@ dependencies:
   - pip
   - pip:
     - ommx>=0.0.21          # Not available via conda
-    # cuOpt installation handled separately due to special requirements 
+    - cuopt-cu12==25.5.0 --extra-index-url=https://pypi.nvidia.com  # NVIDIA cuOpt 
