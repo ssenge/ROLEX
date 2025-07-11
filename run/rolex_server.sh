@@ -14,7 +14,7 @@ DEFAULT_PORT=8000
 DEFAULT_LOG_DIR="."
 LOG_DIR="$DEFAULT_LOG_DIR"
 CONDA_ENV_NAME="rolex-server"
-CONDA_PATH="/opt/homebrew/anaconda3"
+CONDA_PATH="/opt/miniforge"
 
 # Check if conda is available and environment exists
 check_conda_env() {
@@ -141,7 +141,7 @@ start_server() {
     # Start server with conda environment activation
     nohup bash -c "
         # Set up paths explicitly for conda
-        export PATH='${CONDA_PATH}/bin:\$PATH'
+        export PATH='${CONDA_PATH}/condabin:\$PATH'
         
         # Source conda setup
         if [ -f ~/.bashrc ]; then
