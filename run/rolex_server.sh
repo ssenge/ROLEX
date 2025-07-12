@@ -23,7 +23,7 @@ check_conda_env() {
         return 1
     fi
     
-    if ! conda info --envs | grep -q "$CONDA_ENV_NAME"; then
+    if ! ls /home/ubuntu/.conda/envs/ | grep -q "$CONDA_ENV_NAME"; then
         echo "⚠️  Conda environment '$CONDA_ENV_NAME' not found."
         echo "   Please create it with: conda create -n $CONDA_ENV_NAME python=3.11 -y"
         return 1
@@ -149,10 +149,16 @@ start_server() {
         fi
         
         # Activate conda environment
-        conda activate $CONDA_ENV_NAME || {
-            echo 'Failed to activate conda environment $CONDA_ENV_NAME' >&2
-            exit 1
-        }
+        export PATH=\"/home/ubuntu/.conda/envs/$CONDA_ENV_NAME/bin:\$PATH\"
+        export CONDA_PREFIX=\"/home/ubuntu/.conda/envs/$CONDA_ENV_NAME\"
+        
+        # Source the cuOpt library paths activation script
+        if [ -f \"/home/ubuntu/.conda/envs/$CONDA_ENV_NAME/etc/conda/activate.d/cuopt_libs.sh\" ]; then
+            source \"/home/ubuntu/.conda/envs/$CONDA_ENV_NAME/etc/conda/activate.d/cuopt_libs.sh\"
+            echo \"Sourced cuOpt library paths from conda activation script\"
+        else
+            echo \"Warning: cuOpt library paths activation script not found\"
+        fi
         
         # Change to server directory and start
         cd '$SERVER_DIR' || {
