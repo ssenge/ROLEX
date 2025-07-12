@@ -22,13 +22,9 @@ except ImportError:
 if TYPE_CHECKING:
     from ommx.v1 import Instance
 
-try:
-    # Import cuOpt for LP/MILP solving
-    import cuopt
-    from cuopt import Model, Variable, Constraint, Objective
-    CUOPT_AVAILABLE = True
-except ImportError:
-    CUOPT_AVAILABLE = False
+# Don't import cuopt at module level - do lazy import
+# This avoids library path issues during server startup
+CUOPT_AVAILABLE = None  # Will be determined lazily
 
 # Check GPU availability
 try:
@@ -49,21 +45,42 @@ class CuOptSolver(BaseSolver):
         
     def is_available(self) -> bool:
         """Check if cuOpt is available with GPU support"""
-        if not CUOPT_AVAILABLE:
-            logger.debug("cuOpt library not available")
+        # Lazy import check
+        cuopt_available = self._check_cuopt_import()
+        logger.info(f"cuOpt import check: {cuopt_available}")
+        if not cuopt_available:
+            logger.info("cuOpt library not available")
             return False
             
+        logger.info(f"OMMX_AVAILABLE: {OMMX_AVAILABLE}")
         if not OMMX_AVAILABLE:
-            logger.debug("OMMX library not available")
+            logger.info("OMMX library not available")
             return False
             
         # Check GPU availability
         gpu_available = self._check_gpu_availability()
+        logger.info(f"GPU availability check: {gpu_available}")
         if not gpu_available:
-            logger.debug("No compatible GPU found for cuOpt")
+            logger.info("No compatible GPU found for cuOpt")
             return False
             
+        logger.info("cuOpt solver is available!")
         return True
+        
+    def _check_cuopt_import(self) -> bool:
+        """Lazy import check for cuOpt"""
+        global CUOPT_AVAILABLE
+        if CUOPT_AVAILABLE is None:
+            try:
+                import cuopt
+                CUOPT_AVAILABLE = True
+                logger.info("cuOpt lazy import successful")
+            except ImportError as e:
+                CUOPT_AVAILABLE = False
+                logger.info(f"cuOpt lazy import failed: {e}")
+        else:
+            logger.info(f"cuOpt import already checked: {CUOPT_AVAILABLE}")
+        return CUOPT_AVAILABLE
         
     def _check_gpu_availability(self) -> bool:
         """Check if compatible GPU is available"""
@@ -190,6 +207,9 @@ class CuOptSolver(BaseSolver):
     def _convert_ommx_to_cuopt(self, ommx_instance: "Instance") -> Any:
         """Convert OMMX instance to cuOpt model"""
         try:
+            # Import cuOpt at runtime
+            import cuopt
+            
             # Create cuOpt model
             model = cuopt.Model()
             
