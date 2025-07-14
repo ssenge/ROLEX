@@ -1,6 +1,8 @@
 # === Infrastructure & Deployment ===
 iac/
 iac-test/
+ansilbe/
+terraform/
 
 # === IDE & Editor ===
 .cursor/

@@ -32,24 +32,22 @@ class CuOptMPSSolver(BaseMPSSolver):
     def _check_cuopt_cli(self) -> bool:
         """Check if cuOpt CLI is available and executable"""
         try:
-            # Check if file exists and is executable
-            if not os.path.exists(CUOPT_CLI_PATH):
-                logger.warning(f"cuOpt CLI not found at {CUOPT_CLI_PATH}")
-                return False
-            
-            if not os.access(CUOPT_CLI_PATH, os.X_OK):
-                logger.warning(f"cuOpt CLI not executable at {CUOPT_CLI_PATH}")
-                return False
-            
-            # Test actual execution
+            # Test actual execution (cuopt_cli is a command in PATH, not a file path)
             result = subprocess.run(
                 [CUOPT_CLI_PATH, '--help'], 
                 capture_output=True, 
                 text=True, 
                 timeout=10
             )
-            return result.returncode == 0
+            if result.returncode == 0:
+                return True
+            else:
+                logger.warning(f"cuOpt CLI failed with return code {result.returncode}: {result.stderr}")
+                return False
             
+        except FileNotFoundError:
+            logger.warning(f"cuOpt CLI command '{CUOPT_CLI_PATH}' not found in PATH")
+            return False
         except Exception as e:
             logger.error(f"cuOpt CLI check failed: {str(e)}")
             return False

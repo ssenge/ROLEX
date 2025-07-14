@@ -8,6 +8,7 @@ import asyncio
 import tempfile
 import os
 import json
+import traceback
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, BackgroundTasks, status, File, UploadFile, Form
 from fastapi.responses import JSONResponse
@@ -171,6 +172,8 @@ async def submit_mps_job(
                 pass
         
         logger.error(f"Error submitting MPS job: {str(e)}")
+        logger.error(f"Exception type: {type(e).__name__}")
+        logger.error(f"Full traceback:\n{traceback.format_exc()}")
         raise HTTPException(
             status_code=500,
             detail=f"Error submitting job: {str(e)}"
@@ -212,10 +215,16 @@ async def list_jobs():
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
     """Global exception handler for unhandled exceptions."""
-    logger.error(f"Unhandled exception: {str(exc)}")
+    error_msg = f"Unhandled exception: {str(exc)}"
+    logger.error(error_msg)
+    logger.error(f"Exception type: {type(exc).__name__}")
+    logger.error(f"Request URL: {request.url}")
+    logger.error(f"Request method: {request.method}")
+    logger.error(f"Full traceback:\n{traceback.format_exc()}")
+    
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error"}
+        content={"detail": f"Internal server error: {str(exc)}"}
     )
 
 

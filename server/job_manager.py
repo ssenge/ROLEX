@@ -188,7 +188,7 @@ class JobManager:
             solver = self.mps_solvers[job.solver_type]
             
             # Execute optimization
-            result = solver.solve(job.mps_file_path, job.parameters)
+            result = solver.solve_with_timing(job.mps_file_path, job.parameters)
             
             # Update job with result
             with self.lock:
