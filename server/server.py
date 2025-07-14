@@ -66,7 +66,7 @@ app = FastAPI(
 @app.get("/", response_model=ServerInfo)
 async def get_server_info():
     """Get server information and available solvers."""
-    if not solver_manager:
+    if solver_manager is None:
         raise HTTPException(status_code=500, detail="Server not initialized")
     
     mps_solvers = solver_manager.get_available_mps_solvers()
@@ -91,7 +91,7 @@ async def health_check():
 @app.get("/solvers/mps")
 async def get_mps_solvers():
     """Get available MPS solvers."""
-    if not solver_manager:
+    if solver_manager is None:
         raise HTTPException(status_code=500, detail="Server not initialized")
     
     return solver_manager.get_available_mps_solvers()
@@ -105,7 +105,7 @@ async def submit_mps_job(
     parameters: str = Form(default="{}")
 ):
     """Submit an MPS optimization job."""
-    if not solver_manager:
+    if solver_manager is None:
         raise HTTPException(status_code=500, detail="Server not initialized")
     
     try:
@@ -192,7 +192,7 @@ async def submit_mps_job(
 @app.get("/jobs/{job_id}/mps", response_model=MPSJobStatusResponse)
 async def get_mps_job_status(job_id: str):
     """Get the status of an MPS job."""
-    if not solver_manager:
+    if solver_manager is None:
         raise HTTPException(status_code=500, detail="Server not initialized")
     
     try:
@@ -212,7 +212,7 @@ async def get_mps_job_status(job_id: str):
 @app.get("/jobs")
 async def list_jobs():
     """List all jobs."""
-    if not solver_manager:
+    if solver_manager is None:
         raise HTTPException(status_code=500, detail="Server not initialized")
     
     jobs = await solver_manager.list_jobs()

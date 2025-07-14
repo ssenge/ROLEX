@@ -164,7 +164,7 @@ async def main():
     print(f"DEBUG: job_manager type: {type(job_manager)}")
     print(f"DEBUG: job_manager is None: {job_manager is None}")
     print(f"DEBUG: bool(job_manager): {bool(job_manager)}")
-    if not job_manager:
+    if job_manager is None:  # Fixed: use explicit None check instead of boolean evaluation
         print("Job manager failed, exiting...")
         return 1
     
