@@ -43,12 +43,14 @@ def test_solver_initialization():
     print("\n=== Testing solver initialization ===")
     try:
         print("Creating Gurobi solver...")
+        from solvers.gurobi_mps_solver import GurobiMPSSolver
         gurobi_solver = GurobiMPSSolver()
         print(f"✓ Gurobi solver created: {gurobi_solver}")
         print(f"  Available: {gurobi_solver.is_available()}")
         print(f"  Info: {gurobi_solver.get_solver_info()}")
         
         print("Creating cuOpt solver...")
+        from solvers.cuopt_mps_solver import CuOptMPSSolver
         cuopt_solver = CuOptMPSSolver()
         print(f"✓ cuOpt solver created: {cuopt_solver}")
         print(f"  Available: {cuopt_solver.is_available()}")
