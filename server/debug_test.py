@@ -67,6 +67,7 @@ def test_job_manager():
     print("\n=== Testing job manager ===")
     try:
         print("Creating JobManager...")
+        from job_manager import JobManager
         job_manager = JobManager(max_workers=1)
         print(f"✓ JobManager created: {job_manager}")
         
@@ -113,6 +114,7 @@ async def test_direct_mps_job(job_manager, mps_file_path):
     print("\n=== Testing direct MPS job submission ===")
     try:
         from models import MPSOptimizationRequest, MPSSolverType
+        import time
         
         # Test with Gurobi first
         print("Testing with Gurobi solver...")
@@ -129,7 +131,6 @@ async def test_direct_mps_job(job_manager, mps_file_path):
         print(f"✓ Job submitted with ID: {job_id}")
         
         # Wait a bit and check status
-        import time
         time.sleep(2)
         
         status_response = await job_manager.get_mps_job_status(job_id)
