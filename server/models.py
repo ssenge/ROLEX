@@ -28,6 +28,12 @@ class SolverType(str, Enum):
     SCIPY = "scipy"  # Basic fallback solver
 
 
+class MPSSolverType(str, Enum):
+    """Available MPS solver types"""
+    GUROBI = "gurobi"
+    CUOPT = "cuopt"
+
+
 class OptimizationRequest(BaseModel):
     """Request to solve an optimization problem"""
     solver: SolverType
@@ -59,6 +65,25 @@ class OptimizationRequest(BaseModel):
         }
 
 
+class MPSOptimizationRequest(BaseModel):
+    """Request to solve an MPS optimization problem"""
+    solver: MPSSolverType
+    parameters: Optional[Dict[str, Any]] = {}
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "solver": "gurobi",
+                "parameters": {
+                    "max_time": 300,
+                    "threads": 4,
+                    "gap_tolerance": 0.01,
+                    "verbose": True
+                }
+            }
+        }
+
+
 class OptimizationResponse(BaseModel):
     """Response containing optimization results"""
     status: str
@@ -68,6 +93,52 @@ class OptimizationResponse(BaseModel):
     solver: Optional[str] = None
     message: Optional[str] = None
     ommx_state_bytes: Optional[List[int]] = None  # OMMX State as bytes (list of integers)
+
+
+class SolverDiagnostics(BaseModel):
+    """Solver diagnostic information"""
+    iterations: Optional[int] = None
+    nodes: Optional[int] = None
+    gap: Optional[float] = None
+    bound: Optional[float] = None
+    status_code: Optional[int] = None
+
+
+class MPSOptimizationResponse(BaseModel):
+    """Response containing MPS optimization results"""
+    status: str
+    objective_value: Optional[float] = None
+    variables: Dict[str, float] = {}
+    solve_time: Optional[float] = None
+    total_time: Optional[float] = None
+    solver: Optional[str] = None
+    message: Optional[str] = None
+    parameters_used: Dict[str, Any] = {}
+    solver_info: SolverDiagnostics = SolverDiagnostics()
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "status": "optimal",
+                "objective_value": 1.0,
+                "variables": {
+                    "x1": 1.0,
+                    "x2": 0.0
+                },
+                "solve_time": 0.0003,
+                "total_time": 0.0015,
+                "solver": "gurobi",
+                "parameters_used": {
+                    "max_time": 300,
+                    "threads": 4
+                },
+                "solver_info": {
+                    "iterations": 3,
+                    "nodes": 1,
+                    "gap": 0.0
+                }
+            }
+        }
 
 
 class JobSubmissionResponse(BaseModel):
@@ -85,6 +156,17 @@ class JobStatusResponse(BaseModel):
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
     result: Optional[OptimizationResponse] = None
+    error: Optional[str] = None
+
+
+class MPSJobStatusResponse(BaseModel):
+    """Response when checking MPS job status"""
+    job_id: str
+    status: JobStatus
+    submitted_at: str
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    result: Optional[MPSOptimizationResponse] = None
     error: Optional[str] = None
 
 

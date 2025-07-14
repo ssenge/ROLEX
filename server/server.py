@@ -4,8 +4,11 @@ ROLEX Server - HTTP Server
 
 import logging
 import asyncio
+import tempfile
+import os
+import json
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, BackgroundTasks, status
+from fastapi import FastAPI, HTTPException, BackgroundTasks, status, File, UploadFile, Form
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 import uvicorn
@@ -13,6 +16,8 @@ import uvicorn
 from models import (
     OptimizationRequest, OptimizationResponse,
     JobSubmissionResponse, JobStatusResponse, ServerInfo,
+    MPSOptimizationRequest, MPSJobStatusResponse,
+    MPSSolverType,
     SERVER_NAME, SERVER_VERSION, SERVER_DESCRIPTION
 )
 from job_manager import JobManager
@@ -90,6 +95,15 @@ async def get_solvers():
     return solver_manager.get_available_solvers()
 
 
+@app.get("/solvers/mps")
+async def get_mps_solvers():
+    """Get available MPS solvers and their status"""
+    if solver_manager is None:
+        raise HTTPException(status_code=503, detail="Server not ready")
+    
+    return solver_manager.get_available_mps_solvers()
+
+
 @app.post("/jobs/submit", response_model=JobSubmissionResponse)
 async def submit_job(request: OptimizationRequest):
     """Submit an optimization job"""
@@ -125,6 +139,87 @@ async def submit_job(request: OptimizationRequest):
         )
 
 
+@app.post("/jobs/submit-mps", response_model=JobSubmissionResponse)
+async def submit_mps_job(
+    mps_file: UploadFile = File(...),
+    solver: str = Form(...),
+    parameters: str = Form(default="{}")
+):
+    """Submit an MPS optimization job"""
+    if solver_manager is None:
+        raise HTTPException(status_code=503, detail="Server not ready")
+    
+    # Validate file type
+    if not mps_file.filename.endswith('.mps'):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File must be an MPS file (.mps extension)"
+        )
+    
+    # Validate solver type
+    try:
+        solver_type = MPSSolverType(solver)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid solver type: {solver}. Available: {[s.value for s in MPSSolverType]}"
+        )
+    
+    # Parse parameters
+    try:
+        params = json.loads(parameters)
+    except json.JSONDecodeError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid JSON in parameters field"
+        )
+    
+    # Create temporary file for MPS content
+    try:
+        # Read file content
+        mps_content = await mps_file.read()
+        
+        # Create temporary file
+        temp_fd, temp_path = tempfile.mkstemp(suffix='.mps', prefix='rolex_mps_')
+        
+        try:
+            with os.fdopen(temp_fd, 'wb') as f:
+                f.write(mps_content)
+            
+            # Submit job to solver manager
+            job_id = solver_manager.submit_mps_job(
+                solver_type=solver_type,
+                mps_file_path=temp_path,
+                parameters=params
+            )
+            
+            return JobSubmissionResponse(
+                job_id=job_id,
+                status="queued",
+                message=f"MPS job submitted successfully with {solver_type.value} solver"
+            )
+            
+        except Exception as e:
+            # Clean up temporary file on error
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            raise e
+            
+    except ValueError as e:
+        # Model validation or solver availability errors
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        # Unexpected errors
+        logger.error(f"Failed to submit MPS job: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to submit MPS job"
+        )
+
+
 @app.get("/jobs/{job_id}", response_model=JobStatusResponse)
 async def get_job_status(job_id: str):
     """Get the status of a specific job"""
@@ -137,6 +232,23 @@ async def get_job_status(job_id: str):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Job {job_id} not found"
+        )
+    
+    return job_status
+
+
+@app.get("/jobs/{job_id}/mps", response_model=MPSJobStatusResponse)
+async def get_mps_job_status(job_id: str):
+    """Get the status of a specific MPS job"""
+    if solver_manager is None:
+        raise HTTPException(status_code=503, detail="Server not ready")
+    
+    job_status = solver_manager.get_mps_job_status(job_id)
+    
+    if job_status is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"MPS Job {job_id} not found"
         )
     
     return job_status
