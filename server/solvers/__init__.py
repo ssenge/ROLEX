@@ -1,10 +1,10 @@
 """
 ROLEX Server - Solvers Package
+MPS-only solvers for optimization
 """
 
-from .base import BaseSolver
-from .gurobi_solver import GurobiSolver
-from .scipy_solver import SciPyLPSolver
-from .cuopt_solver import CuOptSolver
+from .mps_base import BaseMPSSolver
+from .gurobi_mps_solver import GurobiMPSSolver
+from .cuopt_mps_solver import CuOptMPSSolver
 
-__all__ = ["BaseSolver", "GurobiSolver", "SciPyLPSolver", "CuOptSolver"] 
+__all__ = ["BaseMPSSolver", "GurobiMPSSolver", "CuOptMPSSolver"] 
