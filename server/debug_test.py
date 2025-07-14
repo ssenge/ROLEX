@@ -75,6 +75,7 @@ def test_job_manager():
         available = job_manager.get_available_mps_solvers()
         print(f"✓ Available MPS solvers: {available}")
         
+        print("About to return job_manager...")
         return job_manager
     except Exception as e:
         print(f"✗ JobManager failed: {e}")
@@ -159,6 +160,10 @@ async def main():
     
     # Test job manager
     job_manager = test_job_manager()
+    print(f"DEBUG: test_job_manager returned: {job_manager}")
+    print(f"DEBUG: job_manager type: {type(job_manager)}")
+    print(f"DEBUG: job_manager is None: {job_manager is None}")
+    print(f"DEBUG: bool(job_manager): {bool(job_manager)}")
     if not job_manager:
         print("Job manager failed, exiting...")
         return 1
