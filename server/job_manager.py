@@ -93,7 +93,7 @@ class JobManager:
         for solver_type in MPSSolverType:
             solver_instance = self.mps_solvers.get(solver_type)
             if solver_instance:
-                available[solver_type.value] = solver_instance.get_info()
+                available[solver_type.value] = solver_instance.get_solver_info()
         return available
     
     def is_mps_solver_available(self, solver_type: MPSSolverType) -> bool:
