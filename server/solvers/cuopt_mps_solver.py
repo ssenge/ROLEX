@@ -15,8 +15,8 @@ from models import MPSOptimizationResponse, SolverDiagnostics
 
 logger = logging.getLogger(__name__)
 
-# cuOpt CLI path - correct location based on deployment
-CUOPT_CLI_PATH = "/home/ubuntu/.conda/envs/cuOpt-server/bin/cuopt_cli"
+# cuOpt CLI path - available globally in rolex-server environment
+CUOPT_CLI_PATH = "cuopt_cli"
 
 
 class CuOptMPSSolver(BaseMPSSolver):

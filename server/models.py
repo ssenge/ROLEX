@@ -1,6 +1,6 @@
 """
 ROLEX Server - API Models
-Clean request/response models for optimization jobs
+Clean request/response models for MPS optimization jobs
 """
 from typing import Dict, Any, Optional, List
 from pydantic import BaseModel
@@ -20,49 +20,10 @@ class JobStatus(str, Enum):
     FAILED = "failed"
 
 
-class SolverType(str, Enum):
-    """Available solver types"""
-    GUROBI = "gurobi"
-    CPLEX = "cplex"  # Future extension
-    CUOPT = "cuopt"  # GPU-accelerated solver
-    SCIPY = "scipy"  # Basic fallback solver
-
-
 class MPSSolverType(str, Enum):
     """Available MPS solver types"""
     GUROBI = "gurobi"
     CUOPT = "cuopt"
-
-
-class OptimizationRequest(BaseModel):
-    """Request to solve an optimization problem"""
-    solver: SolverType
-    model: List[int]  # OMMX model as bytes (list of integers)
-    parameters: Optional[Dict[str, Any]] = {}
-    
-    class Config:
-        schema_extra = {
-            "example": {
-                "solver": "gurobi",
-                "model": {
-                    "variables": [
-                        {"id": 1, "name": "x1", "type": "continuous", "bound": {"lower": 0, "upper": 10}},
-                        {"id": 2, "name": "x2", "type": "continuous", "bound": {"lower": 0, "upper": 10}}
-                    ],
-                    "constraints": [
-                        {"id": 1, "name": "sum_constraint", "expression": "x1 + x2 <= 5"}
-                    ],
-                    "objective": {
-                        "sense": "maximize",
-                        "expression": "3*x1 + 2*x2"
-                    }
-                },
-                "parameters": {
-                    "time_limit": 60,
-                    "verbose": True
-                }
-            }
-        }
 
 
 class MPSOptimizationRequest(BaseModel):
@@ -76,23 +37,12 @@ class MPSOptimizationRequest(BaseModel):
                 "solver": "gurobi",
                 "parameters": {
                     "max_time": 300,
-                    "threads": 4,
                     "gap_tolerance": 0.01,
+                    "threads": 4,
                     "verbose": True
                 }
             }
         }
-
-
-class OptimizationResponse(BaseModel):
-    """Response containing optimization results"""
-    status: str
-    objective_value: Optional[float] = None
-    variables: Dict[str, float] = {}
-    solve_time: Optional[float] = None
-    solver: Optional[str] = None
-    message: Optional[str] = None
-    ommx_state_bytes: Optional[List[int]] = None  # OMMX State as bytes (list of integers)
 
 
 class SolverDiagnostics(BaseModel):
@@ -120,22 +70,18 @@ class MPSOptimizationResponse(BaseModel):
         schema_extra = {
             "example": {
                 "status": "optimal",
-                "objective_value": 1.0,
+                "objective_value": 42.0,
                 "variables": {
                     "x1": 1.0,
-                    "x2": 0.0
+                    "x2": 2.0
                 },
-                "solve_time": 0.0003,
-                "total_time": 0.0015,
+                "solve_time": 0.123,
+                "total_time": 0.456,
                 "solver": "gurobi",
+                "message": "Optimization terminated successfully",
                 "parameters_used": {
                     "max_time": 300,
-                    "threads": 4
-                },
-                "solver_info": {
-                    "iterations": 3,
-                    "nodes": 1,
-                    "gap": 0.0
+                    "gap_tolerance": 0.01
                 }
             }
         }
@@ -146,17 +92,6 @@ class JobSubmissionResponse(BaseModel):
     job_id: str
     status: JobStatus
     message: str
-
-
-class JobStatusResponse(BaseModel):
-    """Response when checking job status"""
-    job_id: str
-    status: JobStatus
-    submitted_at: str
-    started_at: Optional[str] = None
-    completed_at: Optional[str] = None
-    result: Optional[OptimizationResponse] = None
-    error: Optional[str] = None
 
 
 class MPSJobStatusResponse(BaseModel):

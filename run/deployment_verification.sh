@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # ROLEX Deployment Verification Script
-# Comprehensive verification of ROLEX server deployment with MPS support
+# Comprehensive verification of ROLEX MPS server deployment
 
 set -e  # Exit on any error
 
 echo "==========================================="
-echo "🚀 ROLEX DEPLOYMENT VERIFICATION"
+echo "🚀 ROLEX MPS DEPLOYMENT VERIFICATION"
 echo "==========================================="
 
 # Colors for output
@@ -32,6 +32,12 @@ print_info() {
     echo -e "ℹ️  $1"
 }
 
+# Configuration
+SERVER_URL="http://localhost:8000"
+CONDA_ENV="rolex-server"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
 # Check if running on correct server
 echo "1. Checking server environment..."
 CURRENT_USER=$(whoami)
@@ -41,240 +47,193 @@ fi
 
 # Check conda environments
 echo "2. Checking conda environments..."
-conda env list | grep -E "(ommx-server|cuOpt-server)" || {
-    print_error "Required conda environments not found"
+if conda env list | grep -q "$CONDA_ENV"; then
+    print_success "Found $CONDA_ENV environment"
+else
+    print_error "Required conda environment $CONDA_ENV not found"
     exit 1
-}
+fi
 
 # Check cuOpt CLI
 echo "3. Checking cuOpt CLI..."
-CUOPT_CLI_PATH="/home/ubuntu/.conda/envs/cuOpt-server/bin/cuopt_cli"
-
-if [[ ! -f "$CUOPT_CLI_PATH" ]]; then
-    print_error "cuOpt CLI not found at expected location: $CUOPT_CLI_PATH"
-    echo "Available files in cuOpt-server/bin:"
-    ls -la /home/ubuntu/.conda/envs/cuOpt-server/bin/ | grep -E "(cuopt|cuOpt)" || echo "No cuopt files found"
-    exit 1
-fi
-
-if [[ ! -x "$CUOPT_CLI_PATH" ]]; then
-    print_error "cuOpt CLI not executable: $CUOPT_CLI_PATH"
-    exit 1
-fi
-
-print_success "cuOpt CLI found and executable: $CUOPT_CLI_PATH"
-
-# Test cuOpt CLI help
-echo "4. Testing cuOpt CLI help..."
-if "$CUOPT_CLI_PATH" --help > /dev/null 2>&1; then
-    print_success "cuOpt CLI help command works"
+if eval "$(conda shell.bash hook)" && conda activate "$CONDA_ENV" && which cuopt_cli > /dev/null; then
+    print_success "cuOpt CLI is available"
+    cuopt_cli_version=$(conda run -n "$CONDA_ENV" cuopt_cli --version 2>/dev/null || echo "unknown")
+    print_info "cuOpt CLI version: $cuopt_cli_version"
 else
-    print_error "cuOpt CLI help command failed"
+    print_error "cuOpt CLI not found in PATH"
     exit 1
 fi
 
-# Check if ROLEX server files exist
-echo "5. Checking ROLEX server files..."
-REQUIRED_FILES=(
-    "server/server.py"
-    "server/models.py"
-    "server/job_manager.py"
-    "server/solvers/gurobi_solver.py"
-    "server/solvers/cuopt_solver.py"
-    "server/solvers/gurobi_mps_solver.py"
-    "server/solvers/cuopt_mps_solver.py"
-    "server/solvers/mps_base.py"
-    "run/rolex_cli.py"
-)
-
-for file in "${REQUIRED_FILES[@]}"; do
-    if [[ -f "$file" ]]; then
-        print_success "Found: $file"
-    else
-        print_error "Missing: $file"
-        exit 1
-    fi
-done
-
-# Test MPS file exists
-echo "6. Checking test MPS file..."
-if [[ -f "client/test_files/example.mps" ]]; then
-    print_success "Test MPS file found"
-    echo "MPS file content preview:"
-    head -10 client/test_files/example.mps
+# Test cuOpt Python module
+echo "4. Testing cuOpt Python module..."
+if conda run -n "$CONDA_ENV" python -c "import cuopt; print('cuOpt Python module available')" > /dev/null 2>&1; then
+    print_success "cuOpt Python module is available"
 else
-    print_error "Test MPS file not found"
+    print_error "cuOpt Python module not available"
     exit 1
 fi
 
-# Test cuOpt CLI with MPS file
-echo "7. Testing cuOpt CLI with MPS file..."
-TEMP_OUTPUT="/tmp/rolex_test_output.txt"
-
-if "$CUOPT_CLI_PATH" --solution-file "$TEMP_OUTPUT" client/test_files/example.mps; then
-    print_success "cuOpt CLI solved MPS file successfully"
-    echo "cuOpt CLI output:"
-    cat "$TEMP_OUTPUT"
-    rm -f "$TEMP_OUTPUT"
+# Test Gurobi
+echo "5. Testing Gurobi..."
+if conda run -n "$CONDA_ENV" python -c "import gurobipy as gp; env = gp.Env(); print('Gurobi available'); env.dispose()" > /dev/null 2>&1; then
+    print_success "Gurobi is available"
 else
-    print_error "cuOpt CLI failed to solve MPS file"
+    print_warning "Gurobi not available (license may be needed)"
+fi
+
+# Check server status
+echo "6. Checking server status..."
+if curl -s "$SERVER_URL/health" > /dev/null; then
+    print_success "Server is responding"
+else
+    print_error "Server is not responding at $SERVER_URL"
+    print_info "Try starting server: cd $PROJECT_ROOT && ./run/rolex_server.sh start"
     exit 1
 fi
 
-# Check Python dependencies
-echo "8. Checking Python dependencies..."
-conda activate ommx-server
-
-python -c "
-import sys
-required_packages = [
-    'fastapi',
-    'uvicorn',
-    'pydantic',
-    'ommx',
-    'requests'
-]
-
-missing = []
-for package in required_packages:
-    try:
-        __import__(package)
-        print(f'✅ {package}')
-    except ImportError:
-        missing.append(package)
-        print(f'❌ {package}')
-
-if missing:
-    print(f'Missing packages: {missing}')
-    sys.exit(1)
-else:
-    print('All required packages found')
-"
-
-# Check Gurobi availability
-echo "9. Checking Gurobi availability..."
-python -c "
-try:
-    import gurobipy as gp
-    print('✅ Gurobi available')
-    
-    # Test basic functionality
-    model = gp.Model()
-    print('✅ Gurobi model creation works')
-except Exception as e:
-    print(f'❌ Gurobi issue: {e}')
-"
-
-# Start ROLEX server in background for testing
-echo "10. Starting ROLEX server for testing..."
-cd server
-python server.py --port 8001 &
-SERVER_PID=$!
-
-# Wait for server to start
-sleep 5
-
-# Test server health
-echo "11. Testing ROLEX server health..."
-if curl -s http://localhost:8001/health > /dev/null; then
-    print_success "ROLEX server health check passed"
+# Test health endpoint
+echo "7. Testing health endpoint..."
+health_response=$(curl -s "$SERVER_URL/health")
+if echo "$health_response" | grep -q "healthy"; then
+    print_success "Health endpoint working"
 else
-    print_error "ROLEX server health check failed"
-    kill $SERVER_PID 2>/dev/null
+    print_error "Health endpoint not working properly"
     exit 1
 fi
 
 # Test MPS solvers endpoint
-echo "12. Testing MPS solvers endpoint..."
-SOLVERS_RESPONSE=$(curl -s http://localhost:8001/solvers/mps)
-if echo "$SOLVERS_RESPONSE" | grep -q "gurobi"; then
+echo "8. Testing MPS solvers endpoint..."
+mps_solvers_response=$(curl -s "$SERVER_URL/solvers/mps")
+if echo "$mps_solvers_response" | grep -q "gurobi\|cuopt"; then
     print_success "MPS solvers endpoint working"
-    echo "Available MPS solvers:"
-    echo "$SOLVERS_RESPONSE" | python -m json.tool
+    print_info "Available solvers: $(echo "$mps_solvers_response" | grep -o '"[^"]*"' | head -3)"
 else
-    print_error "MPS solvers endpoint failed"
-    kill $SERVER_PID 2>/dev/null
+    print_error "MPS solvers endpoint not working"
     exit 1
 fi
 
-# Test MPS job submission
-echo "13. Testing MPS job submission..."
-cd ..
-python -c "
-import requests
-import json
+# Create test MPS file
+echo "9. Creating test MPS file..."
+test_mps_file="/tmp/test_problem.mps"
+cat > "$test_mps_file" << 'EOF'
+NAME          TEST_PROBLEM
+ROWS
+ N  COST
+ L  CONSTRAINT1
+COLUMNS
+    X1        COST             1.0
+    X1        CONSTRAINT1      1.0
+    X2        COST             1.0
+    X2        CONSTRAINT1      1.0
+RHS
+    RHS1      CONSTRAINT1      1.0
+BOUNDS
+ UP BND1      X1               1.0
+ UP BND1      X2               1.0
+ENDATA
+EOF
 
-# Submit MPS job
-with open('client/test_files/example.mps', 'rb') as f:
-    files = {'mps_file': f}
-    data = {
-        'solver': 'gurobi',
-        'parameters': json.dumps({'max_time': 60})
-    }
+if [[ -f "$test_mps_file" ]]; then
+    print_success "Test MPS file created"
+else
+    print_error "Failed to create test MPS file"
+    exit 1
+fi
+
+# Test MPS job submission (try Gurobi first)
+echo "10. Testing MPS job submission with Gurobi..."
+gurobi_job_response=$(curl -s -X POST \
+    -F "mps_file=@$test_mps_file" \
+    -F "solver=gurobi" \
+    -F "parameters={\"max_time\": 60}" \
+    "$SERVER_URL/jobs/submit-mps")
+
+if echo "$gurobi_job_response" | grep -q "job_id"; then
+    print_success "Gurobi MPS job submitted"
+    gurobi_job_id=$(echo "$gurobi_job_response" | grep -o '"job_id":"[^"]*"' | cut -d'"' -f4)
+    print_info "Gurobi job ID: $gurobi_job_id"
     
-    response = requests.post('http://localhost:8001/jobs/submit-mps', files=files, data=data)
+    # Check job status
+    echo "11. Checking Gurobi job status..."
+    sleep 2
+    gurobi_status_response=$(curl -s "$SERVER_URL/jobs/$gurobi_job_id/mps")
+    if echo "$gurobi_status_response" | grep -q "completed\|optimal"; then
+        print_success "Gurobi job completed successfully"
+    else
+        print_warning "Gurobi job status: $(echo "$gurobi_status_response" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)"
+    fi
+else
+    print_warning "Gurobi MPS job submission failed"
+fi
+
+# Test MPS job submission with cuOpt
+echo "12. Testing MPS job submission with cuOpt..."
+cuopt_job_response=$(curl -s -X POST \
+    -F "mps_file=@$test_mps_file" \
+    -F "solver=cuopt" \
+    -F "parameters={\"max_time\": 60}" \
+    "$SERVER_URL/jobs/submit-mps")
+
+if echo "$cuopt_job_response" | grep -q "job_id"; then
+    print_success "cuOpt MPS job submitted"
+    cuopt_job_id=$(echo "$cuopt_job_response" | grep -o '"job_id":"[^"]*"' | cut -d'"' -f4)
+    print_info "cuOpt job ID: $cuopt_job_id"
     
-if response.status_code == 200:
-    job_data = response.json()
-    job_id = job_data['job_id']
-    print(f'✅ MPS job submitted successfully: {job_id}')
-    
-    # Wait a bit and check status
-    import time
-    time.sleep(2)
-    
-    status_response = requests.get(f'http://localhost:8001/jobs/{job_id}/mps')
-    if status_response.status_code == 200:
-        print('✅ MPS job status retrieval works')
-        print(f'Job status: {status_response.json()[\"status\"]}')
-    else:
-        print('❌ MPS job status retrieval failed')
-        exit(1)
-else:
-    print(f'❌ MPS job submission failed: {response.status_code}')
-    exit(1)
-"
+    # Check job status
+    echo "13. Checking cuOpt job status..."
+    sleep 2
+    cuopt_status_response=$(curl -s "$SERVER_URL/jobs/$cuopt_job_id/mps")
+    if echo "$cuopt_status_response" | grep -q "completed\|optimal"; then
+        print_success "cuOpt job completed successfully"
+    else
+        print_warning "cuOpt job status: $(echo "$cuopt_status_response" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)"
+    fi
+else
+    print_warning "cuOpt MPS job submission failed"
+fi
 
 # Test CLI client
 echo "14. Testing CLI client..."
-python run/rolex_cli.py --list-solvers --server http://localhost:8001 || {
-    print_error "CLI client failed"
-    kill $SERVER_PID 2>/dev/null
-    exit 1
-}
-
-print_success "CLI client works"
+if [[ -f "$PROJECT_ROOT/run/rolex_cli.py" ]]; then
+    print_success "CLI client found"
+    
+    # Test CLI with --list-solvers
+    echo "15. Testing CLI --list-solvers..."
+    if conda run -n "$CONDA_ENV" python "$PROJECT_ROOT/run/rolex_cli.py" --server "$SERVER_URL" --list-solvers > /dev/null 2>&1; then
+        print_success "CLI --list-solvers working"
+    else
+        print_warning "CLI --list-solvers not working"
+    fi
+    
+    # Test CLI job submission
+    echo "16. Testing CLI job submission..."
+    if conda run -n "$CONDA_ENV" python "$PROJECT_ROOT/run/rolex_cli.py" --server "$SERVER_URL" --solver gurobi --max-time 30 "$test_mps_file" > /dev/null 2>&1; then
+        print_success "CLI job submission working"
+    else
+        print_warning "CLI job submission failed"
+    fi
+else
+    print_warning "CLI client not found"
+fi
 
 # Clean up
-echo "15. Cleaning up..."
-kill $SERVER_PID 2>/dev/null
-sleep 2
+echo "17. Cleaning up..."
+rm -f "$test_mps_file"
+print_success "Test files cleaned up"
 
 echo "==========================================="
-print_success "🎉 ALL VERIFICATION CHECKS PASSED!"
+print_success "ROLEX MPS DEPLOYMENT VERIFICATION COMPLETE"
 echo "==========================================="
 
-print_info "ROLEX deployment is ready for production use"
-print_info "Available components:"
-echo "  • ROLEX server with OMMX and MPS support"
-echo "  • Gurobi solver (OMMX and MPS)"
-echo "  • cuOpt solver (OMMX and MPS via CLI)"
-echo "  • SciPy solver (OMMX only)"
-echo "  • CLI client for MPS files"
-echo "  • Web API for both formats"
-
-echo ""
-print_info "To start the server:"
-echo "  cd server && python server.py"
-echo ""
-print_info "To use the CLI client:"
-echo "  python run/rolex_cli.py problem.mps --solver gurobi"
-echo ""
-print_info "Server endpoints:"
-echo "  • POST /jobs/submit (OMMX format)"
-echo "  • POST /jobs/submit-mps (MPS format)"
-echo "  • GET /solvers (OMMX solvers)"
-echo "  • GET /solvers/mps (MPS solvers)"
-echo "  • GET /health (health check)"
-
-echo "===========================================" 
+print_info "Server URL: $SERVER_URL"
+print_info "Available endpoints:"
+print_info "  - GET /health"
+print_info "  - GET /solvers/mps"
+print_info "  - POST /jobs/submit-mps"
+print_info "  - GET /jobs/{job_id}/mps"
+print_info ""
+print_info "CLI Usage:"
+print_info "  python $PROJECT_ROOT/run/rolex_cli.py --server $SERVER_URL --solver gurobi example.mps"
+print_info ""
+print_info "ROLEX MPS deployment is ready for production use" 

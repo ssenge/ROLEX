@@ -1,5 +1,6 @@
 """
 ROLEX Server - HTTP Server
+MPS-only optimization server
 """
 
 import logging
@@ -14,8 +15,7 @@ from pydantic import ValidationError
 import uvicorn
 
 from models import (
-    OptimizationRequest, OptimizationResponse,
-    JobSubmissionResponse, JobStatusResponse, ServerInfo,
+    JobSubmissionResponse, ServerInfo,
     MPSOptimizationRequest, MPSJobStatusResponse,
     MPSSolverType,
     SERVER_NAME, SERVER_VERSION, SERVER_DESCRIPTION
@@ -48,12 +48,12 @@ async def lifespan(app: FastAPI):
     yield
     
     # Shutdown
-    logger.info(f"Shutting down {SERVER_NAME} {SERVER_VERSION}...")
+    logger.info(f"{SERVER_NAME} {SERVER_VERSION} shutting down...")
     if solver_manager:
-        solver_manager.shutdown()
+        await solver_manager.shutdown()
     logger.info(f"{SERVER_NAME} {SERVER_VERSION} shutdown complete")
 
-# FastAPI app
+# Create FastAPI app with lifespan
 app = FastAPI(
     title=SERVER_NAME,
     description=SERVER_DESCRIPTION,
@@ -61,217 +61,157 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-
+# Root endpoint
 @app.get("/", response_model=ServerInfo)
 async def get_server_info():
-    """Get server information and status"""
-    if solver_manager is None:
-        raise HTTPException(status_code=503, detail="Server not ready")
+    """Get server information and available solvers."""
+    if not solver_manager:
+        raise HTTPException(status_code=500, detail="Server not initialized")
     
-    stats = solver_manager.get_server_stats()
+    mps_solvers = solver_manager.get_available_mps_solvers()
     
     return ServerInfo(
-        available_solvers=stats["available_solvers"],
-        active_jobs=stats["active_jobs"],
-        total_jobs=stats["total_jobs"]
+        name=SERVER_NAME,
+        version=SERVER_VERSION,
+        status="running",
+        available_solvers=mps_solvers,
+        active_jobs=solver_manager.get_active_jobs_count(),
+        total_jobs=solver_manager.get_total_jobs_count()
     )
 
-
+# Health check endpoint
 @app.get("/health")
 async def health_check():
-    """Simple health check endpoint"""
-    if solver_manager is None:
-        raise HTTPException(status_code=503, detail="Server not ready")
-    
-    return {"status": "healthy", "message": f"{SERVER_NAME} {SERVER_VERSION} is running"}
+    """Health check endpoint."""
+    return {"status": "healthy", "server": SERVER_NAME, "version": SERVER_VERSION}
 
 
-@app.get("/solvers")
-async def get_solvers():
-    """Get available solvers and their status"""
-    if solver_manager is None:
-        raise HTTPException(status_code=503, detail="Server not ready")
-    
-    return solver_manager.get_available_solvers()
-
-
+# MPS Solvers endpoint
 @app.get("/solvers/mps")
 async def get_mps_solvers():
-    """Get available MPS solvers and their status"""
-    if solver_manager is None:
-        raise HTTPException(status_code=503, detail="Server not ready")
+    """Get available MPS solvers."""
+    if not solver_manager:
+        raise HTTPException(status_code=500, detail="Server not initialized")
     
     return solver_manager.get_available_mps_solvers()
 
 
-@app.post("/jobs/submit", response_model=JobSubmissionResponse)
-async def submit_job(request: OptimizationRequest):
-    """Submit an optimization job"""
-    if solver_manager is None:
-        raise HTTPException(status_code=503, detail="Server not ready")
-    
-    try:
-        # Submit job to solver manager
-        job_id = solver_manager.submit_job(
-            solver_type=request.solver,
-            model=request.model,
-            parameters=request.parameters
-        )
-        
-        return JobSubmissionResponse(
-            job_id=job_id,
-            status="queued",
-            message=f"Job submitted successfully with {request.solver.value} solver"
-        )
-        
-    except ValueError as e:
-        # Model validation or solver availability errors
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
-    except Exception as e:
-        # Unexpected errors
-        logger.error(f"Failed to submit job: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to submit job"
-        )
-
-
+# MPS Job submission endpoint
 @app.post("/jobs/submit-mps", response_model=JobSubmissionResponse)
 async def submit_mps_job(
     mps_file: UploadFile = File(...),
     solver: str = Form(...),
     parameters: str = Form(default="{}")
 ):
-    """Submit an MPS optimization job"""
-    if solver_manager is None:
-        raise HTTPException(status_code=503, detail="Server not ready")
+    """Submit an MPS optimization job."""
+    if not solver_manager:
+        raise HTTPException(status_code=500, detail="Server not initialized")
     
-    # Validate file type
-    if not mps_file.filename.endswith('.mps'):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="File must be an MPS file (.mps extension)"
-        )
-    
-    # Validate solver type
     try:
-        solver_type = MPSSolverType(solver)
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid solver type: {solver}. Available: {[s.value for s in MPSSolverType]}"
-        )
-    
-    # Parse parameters
-    try:
-        params = json.loads(parameters)
-    except json.JSONDecodeError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid JSON in parameters field"
-        )
-    
-    # Create temporary file for MPS content
-    try:
-        # Read file content
-        mps_content = await mps_file.read()
-        
-        # Create temporary file
-        temp_fd, temp_path = tempfile.mkstemp(suffix='.mps', prefix='rolex_mps_')
-        
+        # Parse solver type
         try:
-            with os.fdopen(temp_fd, 'wb') as f:
-                f.write(mps_content)
-            
-            # Submit job to solver manager
-            job_id = solver_manager.submit_mps_job(
-                solver_type=solver_type,
-                mps_file_path=temp_path,
-                parameters=params
+            solver_type = MPSSolverType(solver)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid solver type: {solver}. Must be one of: {[s.value for s in MPSSolverType]}"
             )
-            
-            return JobSubmissionResponse(
-                job_id=job_id,
-                status="queued",
-                message=f"MPS job submitted successfully with {solver_type.value} solver"
+        
+        # Parse parameters
+        try:
+            params = json.loads(parameters)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid JSON in parameters")
+        
+        # Validate file type
+        if not mps_file.filename.lower().endswith('.mps'):
+            raise HTTPException(
+                status_code=400,
+                detail="File must be an MPS file (*.mps)"
             )
-            
-        except Exception as e:
-            # Clean up temporary file on error
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-            raise e
-            
-    except ValueError as e:
-        # Model validation or solver availability errors
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+        
+        # Create temp file and save uploaded MPS file
+        with tempfile.NamedTemporaryFile(mode='wb', suffix='.mps', delete=False) as tmp_file:
+            content = await mps_file.read()
+            tmp_file.write(content)
+            tmp_file_path = tmp_file.name
+        
+        logger.info(f"Received MPS file: {mps_file.filename} ({len(content)} bytes)")
+        logger.info(f"Solver: {solver_type.value}, Parameters: {params}")
+        
+        # Create request object
+        request = MPSOptimizationRequest(
+            solver=solver_type,
+            parameters=params
         )
+        
+        # Submit job
+        job_id = await solver_manager.submit_mps_job(request, tmp_file_path)
+        
+        return JobSubmissionResponse(
+            job_id=job_id,
+            status="queued",
+            message="Job submitted successfully"
+        )
+        
+    except HTTPException:
+        # Clean up temp file on error
+        if 'tmp_file_path' in locals():
+            try:
+                os.unlink(tmp_file_path)
+            except OSError:
+                pass
+        raise
     except Exception as e:
-        # Unexpected errors
-        logger.error(f"Failed to submit MPS job: {str(e)}")
+        # Clean up temp file on error
+        if 'tmp_file_path' in locals():
+            try:
+                os.unlink(tmp_file_path)
+            except OSError:
+                pass
+        
+        logger.error(f"Error submitting MPS job: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to submit MPS job"
+            status_code=500,
+            detail=f"Error submitting job: {str(e)}"
         )
 
 
-@app.get("/jobs/{job_id}", response_model=JobStatusResponse)
-async def get_job_status(job_id: str):
-    """Get the status of a specific job"""
-    if solver_manager is None:
-        raise HTTPException(status_code=503, detail="Server not ready")
-    
-    job_status = solver_manager.get_job_status(job_id)
-    
-    if job_status is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Job {job_id} not found"
-        )
-    
-    return job_status
-
-
+# MPS Job status endpoint
 @app.get("/jobs/{job_id}/mps", response_model=MPSJobStatusResponse)
 async def get_mps_job_status(job_id: str):
-    """Get the status of a specific MPS job"""
-    if solver_manager is None:
-        raise HTTPException(status_code=503, detail="Server not ready")
+    """Get the status of an MPS job."""
+    if not solver_manager:
+        raise HTTPException(status_code=500, detail="Server not initialized")
     
-    job_status = solver_manager.get_mps_job_status(job_id)
-    
-    if job_status is None:
+    try:
+        job_status = await solver_manager.get_mps_job_status(job_id)
+        return job_status
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Job not found")
+    except Exception as e:
+        logger.error(f"Error getting MPS job status: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"MPS Job {job_id} not found"
+            status_code=500,
+            detail=f"Error getting job status: {str(e)}"
         )
-    
-    return job_status
 
 
+# List jobs endpoint
 @app.get("/jobs")
 async def list_jobs():
-    """List all jobs (simplified endpoint)"""
-    if solver_manager is None:
-        raise HTTPException(status_code=503, detail="Server not ready")
+    """List all jobs."""
+    if not solver_manager:
+        raise HTTPException(status_code=500, detail="Server not initialized")
     
-    # Return basic statistics
-    stats = solver_manager.get_server_stats()
-    return {
-        "total_jobs": stats["total_jobs"],
-        "active_jobs": stats["active_jobs"],
-        "message": "Use /jobs/{job_id} to get specific job details"
-    }
+    jobs = await solver_manager.list_jobs()
+    return {"jobs": jobs}
 
 
+# Global exception handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
-    """Global exception handler for unexpected errors"""
+    """Global exception handler for unhandled exceptions."""
     logger.error(f"Unhandled exception: {str(exc)}")
     return JSONResponse(
         status_code=500,
@@ -279,46 +219,36 @@ async def global_exception_handler(request, exc):
     )
 
 
+# Server startup function
+def run_server(host: str = "0.0.0.0", port: int = 8000, workers: int = 1):
+    """Run the ROLEX server."""
+    # Store configuration in app state
+    app.state.max_workers = workers
+    
+    # Configure uvicorn
+    config = uvicorn.Config(
+        app,
+        host=host,
+        port=port,
+        log_level="info",
+        access_log=True
+    )
+    
+    server = uvicorn.Server(config)
+    return server.run()
+
+
 if __name__ == "__main__":
     import argparse
-    import uvicorn
     
-    # Parse command line arguments
-    parser = argparse.ArgumentParser(description=f"{SERVER_NAME} {SERVER_VERSION}")
-    parser.add_argument(
-        "--port", 
-        type=int, 
-        default=8000, 
-        help="Port to run the server on (default: 8000)"
-    )
-    parser.add_argument(
-        "--host", 
-        type=str, 
-        default="0.0.0.0", 
-        help="Host to bind the server to (default: 0.0.0.0)"
-    )
-    parser.add_argument(
-        "--max-workers", 
-        type=int, 
-        default=1, 
-        help="Maximum number of concurrent solver instances (default: 1)"
-    )
-    parser.add_argument(
-        "--reload", 
-        action="store_true", 
-        help="Enable auto-reload for development"
-    )
+    parser = argparse.ArgumentParser(description="ROLEX Optimization Server")
+    parser.add_argument("--host", default="0.0.0.0", help="Host to bind to")
+    parser.add_argument("--port", type=int, default=8000, help="Port to bind to")
+    parser.add_argument("--workers", type=int, default=1, help="Number of worker processes")
+    
     args = parser.parse_args()
     
-    # Store max_workers in app state for lifespan function
-    app.state.max_workers = args.max_workers
+    logger.info(f"Starting {SERVER_NAME} {SERVER_VERSION} on {args.host}:{args.port}")
+    logger.info(f"Workers: {args.workers}")
     
-    logger.info(f"Starting {SERVER_NAME} {SERVER_VERSION} on {args.host}:{args.port}...")
-    logger.info(f"Maximum concurrent solver instances: {args.max_workers}")
-    uvicorn.run(
-        "server:app",
-        host=args.host,
-        port=args.port,
-        reload=args.reload,
-        log_level="info"
-    ) 
+    run_server(host=args.host, port=args.port, workers=args.workers) 
