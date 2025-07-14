@@ -171,6 +171,14 @@ async def submit_mps_job(
             except OSError:
                 pass
         
+        # Force immediate console output
+        print(f"=== MPS JOB SUBMISSION ERROR ===")
+        print(f"Error: {str(e)}")
+        print(f"Exception type: {type(e).__name__}")
+        print(f"Full traceback:")
+        print(traceback.format_exc())
+        print(f"=== END ERROR ===")
+        
         logger.error(f"Error submitting MPS job: {str(e)}")
         logger.error(f"Exception type: {type(e).__name__}")
         logger.error(f"Full traceback:\n{traceback.format_exc()}")

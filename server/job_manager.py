@@ -6,6 +6,7 @@ import uuid
 import time
 import threading
 import os
+import traceback
 from datetime import datetime
 from typing import Dict, Any, Optional
 from concurrent.futures import ThreadPoolExecutor
@@ -102,11 +103,17 @@ class JobManager:
     
     async def submit_mps_job(self, request: MPSOptimizationRequest, mps_file_path: str) -> str:
         """Submit an MPS optimization job"""
+        print(f"=== DEBUG: submit_mps_job called with solver {request.solver.value} ===")
+        
         if not self.is_mps_solver_available(request.solver):
+            print(f"=== DEBUG: Solver {request.solver.value} is not available ===")
             raise ValueError(f"Solver {request.solver.value} is not available")
+        
+        print(f"=== DEBUG: Solver {request.solver.value} is available ===")
         
         # Generate job ID
         job_id = str(uuid.uuid4())
+        print(f"=== DEBUG: Generated job ID: {job_id} ===")
         
         # Create job
         job = MPSJob(
@@ -115,14 +122,17 @@ class JobManager:
             mps_file_path=mps_file_path,
             parameters=request.parameters
         )
+        print(f"=== DEBUG: Created job object ===")
         
         # Store job
         with self.lock:
             self.mps_jobs[job_id] = job
             self.total_jobs += 1
+        print(f"=== DEBUG: Stored job in manager ===")
         
         # Submit to executor
         future = self.executor.submit(self._execute_mps_job, job_id)
+        print(f"=== DEBUG: Submitted job to executor ===")
         
         logger.info(f"Submitted MPS job {job_id} with {request.solver.value} solver")
         return job_id
@@ -172,8 +182,11 @@ class JobManager:
     
     def _execute_mps_job(self, job_id: str) -> None:
         """Execute an MPS job"""
+        print(f"=== DEBUG: _execute_mps_job called for job {job_id} ===")
+        
         with self.lock:
             if job_id not in self.mps_jobs:
+                print(f"=== DEBUG: Job {job_id} not found in jobs dict ===")
                 logger.error(f"Job {job_id} not found")
                 return
             
@@ -181,14 +194,18 @@ class JobManager:
             job.status = JobStatus.RUNNING
             job.started_at = datetime.now().isoformat()
         
+        print(f"=== DEBUG: Job {job_id} status set to RUNNING ===")
         logger.info(f"Executing MPS job {job_id} with {job.solver_type.value} solver")
         
         try:
             # Get solver instance
             solver = self.mps_solvers[job.solver_type]
+            print(f"=== DEBUG: Got solver instance: {solver} ===")
             
             # Execute optimization
+            print(f"=== DEBUG: Calling solve_with_timing ===")
             result = solver.solve_with_timing(job.mps_file_path, job.parameters)
+            print(f"=== DEBUG: solve_with_timing completed with status: {result.status} ===")
             
             # Update job with result
             with self.lock:
@@ -196,9 +213,14 @@ class JobManager:
                 job.status = JobStatus.COMPLETED
                 job.completed_at = datetime.now().isoformat()
             
+            print(f"=== DEBUG: Job {job_id} completed successfully ===")
             logger.info(f"Job {job_id} completed with status: {result.status}")
             
         except Exception as e:
+            print(f"=== DEBUG: Job {job_id} failed with exception: {str(e)} ===")
+            print(f"=== DEBUG: Exception type: {type(e).__name__} ===")
+            print(f"=== DEBUG: Traceback: {traceback.format_exc()} ===")
+            
             logger.error(f"Job {job_id} failed: {str(e)}")
             
             with self.lock:
@@ -212,8 +234,10 @@ class JobManager:
                 try:
                     if os.path.exists(job.mps_file_path):
                         os.unlink(job.mps_file_path)
+                        print(f"=== DEBUG: Cleaned up temp file: {job.mps_file_path} ===")
                         logger.debug(f"Cleaned up temp file: {job.mps_file_path}")
                 except Exception as e:
+                    print(f"=== DEBUG: Failed to clean up temp file: {e} ===")
                     logger.warning(f"Failed to clean up temp file {job.mps_file_path}: {e}")
     
     async def shutdown(self):
