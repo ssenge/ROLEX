@@ -19,7 +19,7 @@ from urllib3.util.retry import Retry
 class RolexMPSCLI:
     """CLI client for ROLEX MPS optimization"""
     
-    def __init__(self, server_url: str = "http://localhost:8000"):
+    def __init__(self, server_url: str = "http://localhost:80"):
         self.server_url = server_url.rstrip('/')
         self.session = self._create_session()
         
