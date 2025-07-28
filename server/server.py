@@ -152,7 +152,7 @@ async def submit_mps_job(request: Request):
             tmp_file.write(content)
             tmp_file_path = tmp_file.name
         
-        logger.info(f"Received MPS file: {mps_file.filename} ({len(content)} bytes)")
+        logger.info(f"Received MPS file: {filename} ({len(content)} bytes)")
         logger.info(f"Solver: {solver_type.value}, Parameters: {params}")
         
         # Create request object
