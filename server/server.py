@@ -160,7 +160,7 @@ async def submit_mps_job(request: Request):
 
                 try:
                     # Execute gunzip to decompress the file
-                    command = ["gunzip", "-c", tmp_gz_file_path]
+                    command = ["/usr/bin/gunzip", "-c", tmp_gz_file_path]
                     process = subprocess.run(command, stdout=subprocess.PIPE, check=True)
                     content = process.stdout
                     
