@@ -11,6 +11,8 @@ import sys
 import time
 import csv
 import gzip
+import subprocess
+import tempfile
 from typing import Dict, Any, Optional, List, Generator
 from datetime import datetime
 
@@ -26,6 +28,12 @@ class RolexMPSCLI:
     def __init__(self, server_url: str = "http://localhost:80"):
         self.server_url = server_url.rstrip('/')
         self.session = self._create_session()
+        self.start_time = time.time()
+
+    def _log(self, message: str):
+        """Prints a message with a timestamp prefix."""
+        elapsed_time = time.time() - self.start_time
+        print(f"[{elapsed_time:8.2f}s] {message}")
 
     def _create_session(self) -> requests.Session:
         """Create a requests session with retry strategy"""
@@ -58,13 +66,13 @@ class RolexMPSCLI:
         if not os.path.exists(mps_file_path):
             raise FileNotFoundError(f"MPS file not found: {mps_file_path}")
 
-        print("Checking server health...")
+        self._log("Checking server health...")
         if not self._check_server_health():
             raise RuntimeError(f"ROLEX server not available at {self.server_url}")
 
         job_id = self._submit_mps_job(mps_file_path, solver, max_time, timeout, **kwargs)
 
-        print(f"\n🚀 Job {job_id} submitted to {solver.upper()} solver for file {os.path.basename(mps_file_path)}")
+        self._log(f"🚀 Job {job_id} submitted to {solver.upper()} solver for file {os.path.basename(mps_file_path)}")
         
         result = self._poll_for_results(job_id)
         
@@ -99,41 +107,77 @@ class RolexMPSCLI:
     def _submit_mps_job(self, mps_file_path: str, solver: str,
                        max_time: int, timeout: int, **kwargs) -> str:
         """
-        Compress and stream MPS file to server with progress bar."""
+        Compress MPS file to a temporary file, upload it with progress bar, and submit job."""
         parameters = {'max_time': max_time, **kwargs}
         
-        data_stream = self._compress_stream_with_progress(mps_file_path)
+        original_file_size = os.path.getsize(mps_file_path)
+        compressed_tmp_file = None
 
         try:
-            headers = {
-                'Content-Encoding': 'gzip',
-                'Content-Type': 'application/octet-stream'
-            }
-            params = {
-                'solver': solver,
-                'parameters': json.dumps(parameters),
-                'filename': os.path.basename(mps_file_path) + ".gz"
-            }
+            # 1. Compress to temporary file
+            self._log(f"Compressing '{os.path.basename(mps_file_path)}' to temporary file...")
+            with tempfile.NamedTemporaryFile(suffix=".mps.gz", delete=False) as tmp_gz_file:
+                compressed_tmp_file = tmp_gz_file.name
+                command = ["gzip", "-c", mps_file_path]
+                
+                # Execute gzip and pipe output to the temporary file
+                process = subprocess.run(command, stdout=tmp_gz_file, check=True)
             
-            response = self.session.post(
-                f"{self.server_url}/jobs/submit-mps",
-                params=params,
-                data=data_stream,
-                headers=headers,
-                timeout=timeout
-            )
-            
-            print("\nFile uploaded. Waiting for server to issue Job ID...")
+            compressed_file_size = os.path.getsize(compressed_tmp_file)
+            compression_percentage = (1 - compressed_file_size / original_file_size) * 100 if original_file_size > 0 else 0
+            self._log(f"Compression complete. Compressed from {original_file_size/1024/1024:.2f} MB to {compressed_file_size/1024/1024:.2f} MB ({compression_percentage:.1f}% reduction).")
+
+            # 2. Upload temporary compressed file with progress
+            with open(compressed_tmp_file, 'rb') as f_compressed, tqdm(
+                desc="Uploading compressed file",
+                total=compressed_file_size,
+                unit='B',
+                unit_scale=True,
+                unit_divisor=1024,
+            ) as bar:
+                def read_chunks():
+                    while True:
+                        chunk = f_compressed.read(16384) # Read in chunks
+                        if not chunk:
+                            break
+                        bar.update(len(chunk))
+                        yield chunk
+
+                headers = {
+                    'Content-Encoding': 'gzip',
+                    'Content-Type': 'application/octet-stream'
+                }
+                params = {
+                    'solver': solver,
+                    'parameters': json.dumps(parameters),
+                    'filename': os.path.basename(mps_file_path) + ".gz"
+                }
+                
+                response = self.session.post(
+                    f"{self.server_url}/jobs/submit-mps",
+                    params=params,
+                    data=read_chunks(),
+                    headers=headers,
+                    timeout=timeout
+                )
+                
+            self._log("\nFile uploaded. Waiting for server to issue Job ID...")
             response.raise_for_status()
             return response.json()['job_id']
         except KeyError:
             raise RuntimeError("Invalid server response: missing job_id")
         except requests.exceptions.Timeout:
             raise RuntimeError(f"Request timed out after {timeout} seconds. For larger files, consider increasing the timeout with the --timeout flag.")
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(f"Error during gzip compression: {e}\nStdout: {e.stdout}\nStderr: {e.stderr}")
+        finally:
+            # 3. Clean up temporary file
+            if compressed_tmp_file and os.path.exists(compressed_tmp_file):
+                self._log(f"Removing temporary file: {compressed_tmp_file}")
+                os.remove(compressed_tmp_file)
 
     def _poll_for_results(self, job_id: str) -> Dict[str, Any]:
         """Poll server for job results"""
-        poll_count = 0
         while True:
             try:
                 response = self.session.get(
@@ -144,19 +188,17 @@ class RolexMPSCLI:
                 result = response.json()
                 status = result.get('status', 'unknown')
 
-                if poll_count % 10 == 0:
-                    print(f"Polling for job {job_id}... status: {status}")
+                self._log(f"Polling for job {job_id}... status: {status}")
 
                 if status in ['completed', 'failed']:
                     return result
                 
-                poll_count += 1
-                time.sleep(5)
+                time.sleep(10)
             except requests.exceptions.RequestException as e:
-                print(f"⚠️  Polling error for job {job_id}: {str(e)}")
-                time.sleep(5)
+                self._log(f"⚠️  Polling error for job {job_id}: {str(e)}")
+                time.sleep(10) # Wait before retrying on error
             except KeyboardInterrupt:
-                print(f"\n❌ Interrupted by user. Job {job_id} may still be running on the server.")
+                self._log(f"\n❌ Interrupted by user. Job {job_id} may still be running on the server.")
                 sys.exit(1)
 
     def write_result_to_csv(self, result: Dict[str, Any], csv_path: str, input_filename: str, submission_timestamp: str, completion_timestamp: str, num_variables: int, solver_name: str, store_vars: bool = False):
@@ -194,40 +236,40 @@ class RolexMPSCLI:
 
     def print_pretty_results(self, result: Dict[str, Any], solver: str, mps_file_path: str, show_vars: bool = False):
         """Pretty print optimization results"""
-        print(f"\n{'='*60}")
-        print(f"🎯 ROLEX MPS OPTIMIZATION RESULTS")
-        print(f"\n{'='*60}")
-        print(f"📁 File: {os.path.basename(mps_file_path)}")
-        print(f"🔧 Solver: {solver.upper()}")
-        print(f"🆔 Job ID: {result['job_id']}")
+        self._log(f"\n{'='*60}")
+        self._log(f"🎯 ROLEX MPS OPTIMIZATION RESULTS")
+        self._log(f"\n{'='*60}")
+        self._log(f"📁 File: {os.path.basename(mps_file_path)}")
+        self._log(f"🔧 Solver: {solver.upper()}")
+        self._log(f"🆔 Job ID: {result['job_id']}")
         status = result.get('status', 'unknown')
         status_emoji = self._get_status_emoji(status)
-        print(f"📈 Status: {status_emoji} {status.upper()}")
+        self._log(f"📈 Status: {status_emoji} {status.upper()}")
         if status == 'failed':
             error = result.get('error', 'Unknown error')
-            print(f"❌ Error: {error}")
+            self._log(f"❌ Error: {error}")
             return
         optimization_result = result.get('result')
         if not optimization_result:
-            print("❌ No optimization result available")
+            self._log("❌ No optimization result available")
             return
         obj_value = optimization_result.get('objective_value')
         if obj_value is not None:
-            print(f"🎯 Objective Value: {obj_value}")
+            self._log(f"🎯 Objective Value: {obj_value}")
         solve_time = optimization_result.get('solve_time')
         if solve_time is not None:
-            print(f"⏱️  Solve Time: {solve_time:.4f}s")
+            self._log(f"⏱️  Solve Time: {solve_time:.4f}s")
         
         if show_vars:
             variables = optimization_result.get('variables', {})
             if variables:
-                print(f"\n📊 VARIABLE VALUES ({len(variables)} variables):")
+                self._log(f"\n📊 VARIABLE VALUES ({len(variables)} variables):")
                 sorted_vars = sorted(variables.items())
                 for i, (var_name, var_value) in enumerate(sorted_vars[:20]):
-                    print(f"  {var_name} = {var_value}")
+                    self._log(f"  {var_name} = {var_value}")
                 if len(variables) > 20:
-                    print(f"  ... and {len(variables) - 20} more variables")
-        print(f"\n{'='*60}")
+                    self._log(f"  ... and {len(variables) - 20} more variables")
+        self._log(f"\n{'='*60}")
 
     def _get_status_emoji(self, status: str) -> str:
         """Get emoji for status"""
@@ -255,19 +297,19 @@ class RolexMPSCLI:
         """Print available solvers in a nice format"""
         try:
             solvers = self.list_solvers()
-            print("🔧 Available MPS Solvers:")
-            print("=" * 40)
+            self._log("🔧 Available MPS Solvers:")
+            self._log("=" * 40)
             for solver_name, solver_info in solvers.items():
                 available = solver_info.get('available', False)
                 status_emoji = '✅' if available else '❌'
-                print(f"{status_emoji} {solver_name.upper()}")
+                self._log(f"{status_emoji} {solver_name.upper()}")
                 if available:
-                    print(f"   Version: {solver_info.get('version')}")
+                    self._log(f"   Version: {solver_info.get('version')}")
                 else:
-                    print(f"   Status: {solver_info.get('status', 'unknown')}")
-                print()
+                    self._log(f"   Status: {solver_info.get('status', 'unknown')}")
+                self._log("")
         except Exception as e:
-            print(f"❌ Error listing solvers: {str(e)}")
+            self._log(f"❌ Error listing solvers: {str(e)}")
 
 
 def main():
@@ -372,7 +414,7 @@ Examples:
 
     total_files = len(args.mps_files)
     for i, mps_file in enumerate(args.mps_files):
-        print(f"Processing file {i+1}/{total_files}: {mps_file}")
+        cli._log(f"Processing file {i+1}/{total_files}: {mps_file}")
         try:
             submission_timestamp = datetime.now().isoformat()
             result = cli.solve_mps(
@@ -390,17 +432,17 @@ Examples:
             if args.output_csv:
                 num_variables = len(result.get('result', {}).get('variables', {}))
                 cli.write_result_to_csv(result, args.output_csv, os.path.basename(mps_file), submission_timestamp, completion_timestamp, num_variables, args.solver, store_vars=args.store_var_assignments)
-                print(f"Results for {os.path.basename(mps_file)} written to {args.output_csv}")
+                cli._log(f"Results for {os.path.basename(mps_file)} written to {args.output_csv}")
 
         except Exception as e:
-            print(f"❌ Error processing {mps_file}: {str(e)}")
+            cli._log(f"❌ Error processing {mps_file}: {str(e)}")
             # Optionally write error to CSV as well
             if args.output_csv:
                 error_result = {'job_id': 'failed_submission', 'status': 'error', 'error': str(e)}
                 cli.write_result_to_csv(error_result, args.output_csv, os.path.basename(mps_file), submission_timestamp, datetime.now().isoformat(), 0, args.solver, store_vars=args.store_var_assignments)
         
         if i < total_files - 1:
-            print("-" * 60)
+            cli._log("-" * 60)
 
 if __name__ == "__main__":
     main()

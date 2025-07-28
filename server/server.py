@@ -10,6 +10,7 @@ import os
 import json
 import traceback
 import gzip
+import subprocess
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, BackgroundTasks, status, File, UploadFile, Form, Request
 from fastapi.responses import JSONResponse
@@ -143,14 +144,72 @@ async def submit_mps_job(request: Request):
             
             # Check for gzip compression
             if request.headers.get("content-encoding") == "gzip" or filename.lower().endswith('.gz'):
-                logger.info("Received gzipped file. Decompressing...")
-                try:
-                    content = gzip.decompress(content)
-                except gzip.BadGzipFile:
-                    raise HTTPException(status_code=400, detail="Invalid gzip compressed file.")
+                logger.info("Received gzipped file. Decompressing using gunzip CLI...")
+                
+                # Write gzipped content to a temporary .gz file
+                with tempfile.NamedTemporaryFile(mode='wb', suffix='.gz', delete=False) as tmp_gz_file:
+                    tmp_gz_file.write(content)
+                    tmp_gz_file_path = tmp_gz_file.name
+                
+                gzipped_size = os.path.getsize(tmp_gz_file_path)
+                logger.info(f"Received gzipped file size: {gzipped_size / (1024*1024):.2f} MB")
 
-            tmp_file.write(content)
-            tmp_file_path = tmp_file.name
+                # Create a temporary file for the decompressed content
+                with tempfile.NamedTemporaryFile(mode='wb', suffix='.mps', delete=False) as tmp_decompressed_file:
+                    decompressed_tmp_file_path = tmp_decompressed_file.name
+
+                try:
+                    # Execute gunzip to decompress the file
+                    command = ["gunzip", "-c", tmp_gz_file_path]
+                    process = subprocess.run(command, stdout=subprocess.PIPE, check=True)
+                    content = process.stdout
+                    
+                    # Write the decompressed content to the temporary MPS file
+                    with open(decompressed_tmp_file_path, 'wb') as f_decompressed:
+                        f_decompressed.write(content)
+
+                    decompressed_size = os.path.getsize(decompressed_tmp_file_path)
+                    logger.info(f"Decompression complete. Decompressed to {decompressed_size / (1024*1024):.2f} MB.")
+                    
+                    # Update tmp_file_path to point to the decompressed file
+                    tmp_file_path = decompressed_tmp_file_path
+
+                except subprocess.CalledProcessError as e:
+                    logger.error(f"Error during gunzip decompression: {e}\nStdout: {e.stdout}\nStderr: {e.stderr}")
+                    raise HTTPException(status_code=400, detail="Error during gunzip decompression.")
+                finally:
+                    # Clean up the temporary gzipped file
+                    if os.path.exists(tmp_gz_file_path):
+                        os.unlink(tmp_gz_file_path)
+            else:
+                # If not gzipped, write the content directly
+                tmp_file.write(content)
+                tmp_file_path = tmp_file.name
+            
+            # Ensure tmp_file_path is defined for the outer try-except block
+            if 'tmp_file_path' not in locals():
+                tmp_file_path = None # Initialize to None if not set above
+            
+            # This tmp_file.name is the one that will be passed to the solver manager
+            # It should be the decompressed file if compression was detected, or the original if not.
+            # The outer `with tempfile.NamedTemporaryFile` is no longer needed as we manage temp files manually.
+            # So, we just need to ensure `tmp_file_path` is correctly set.
+            # The original `tmp_file` context manager is removed, and `tmp_file_path` is set directly.
+            # The content is already read into `content` variable.
+            # The `tmp_file.write(content)` and `tmp_file_path = tmp_file.name` lines are moved/modified.
+            # The `with tempfile.NamedTemporaryFile(mode='wb', suffix='.mps', delete=False) as tmp_file:`
+            # block needs to be removed or refactored.
+            # Let's refactor the whole block to make it cleaner.
+            # The `tmp_file_path` should be set once, either to the decompressed file or the original content file.
+            # The `content` variable will hold the final content to be written to the MPS file.
+            
+            # Refactored logic:
+            final_mps_content = content # Assume content is already decompressed or original
+            
+            # Create temp file and save uploaded MPS file
+            with tempfile.NamedTemporaryFile(mode='wb', suffix='.mps', delete=False) as tmp_file_obj:
+                tmp_file_obj.write(final_mps_content)
+                tmp_file_path = tmp_file_obj.name
         
         logger.info(f"Received MPS file: {filename} ({len(content)} bytes)")
         logger.info(f"Solver: {solver_type.value}, Parameters: {params}")
