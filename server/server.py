@@ -9,8 +9,9 @@ import tempfile
 import os
 import json
 import traceback
+import gzip
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, BackgroundTasks, status, File, UploadFile, Form
+from fastapi import FastAPI, HTTPException, BackgroundTasks, status, File, UploadFile, Form, Request
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 import uvicorn
@@ -99,16 +100,21 @@ async def get_mps_solvers():
 
 # MPS Job submission endpoint
 @app.post("/jobs/submit-mps", response_model=JobSubmissionResponse)
-async def submit_mps_job(
-    mps_file: UploadFile = File(...),
-    solver: str = Form(...),
-    parameters: str = Form(default="{}")
-):
+async def submit_mps_job(request: Request):
     """Submit an MPS optimization job."""
     if solver_manager is None:
         raise HTTPException(status_code=500, detail="Server not initialized")
     
     try:
+        # Manually parse query parameters
+        query_params = request.query_params
+        solver = query_params.get("solver")
+        filename = query_params.get("filename")
+        parameters = query_params.get("parameters", "{}")
+
+        if not solver or not filename:
+            raise HTTPException(status_code=400, detail="'solver' and 'filename' are required query parameters.")
+
         # Parse solver type
         try:
             solver_type = MPSSolverType(solver)
@@ -125,15 +131,24 @@ async def submit_mps_job(
             raise HTTPException(status_code=400, detail="Invalid JSON in parameters")
         
         # Validate file type
-        if not mps_file.filename.lower().endswith('.mps'):
+        if not filename.lower().endswith(('.mps', '.mps.gz')):
             raise HTTPException(
                 status_code=400,
-                detail="File must be an MPS file (*.mps)"
+                detail="File must be an MPS file (*.mps, *.mps.gz)"
             )
         
         # Create temp file and save uploaded MPS file
         with tempfile.NamedTemporaryFile(mode='wb', suffix='.mps', delete=False) as tmp_file:
-            content = await mps_file.read()
+            content = await request.body()
+            
+            # Check for gzip compression
+            if request.headers.get("content-encoding") == "gzip" or filename.lower().endswith('.gz'):
+                logger.info("Received gzipped file. Decompressing...")
+                try:
+                    content = gzip.decompress(content)
+                except gzip.BadGzipFile:
+                    raise HTTPException(status_code=400, detail="Invalid gzip compressed file.")
+
             tmp_file.write(content)
             tmp_file_path = tmp_file.name
         
