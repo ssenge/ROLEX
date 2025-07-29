@@ -161,7 +161,7 @@ class RolexMPSCLI:
                     timeout=timeout
                 )
                 
-            self._log("\nFile uploaded. Waiting for server to issue Job ID...")
+            self._log("File uploaded. Waiting for server to issue Job ID...")
             response.raise_for_status()
             return response.json()['job_id']
         except KeyError:
@@ -254,6 +254,12 @@ class RolexMPSCLI:
         if not optimization_result:
             self._log("❌ No optimization result available")
             return
+        
+        num_variables = len(optimization_result.get('variables', {}))
+        num_constraints = optimization_result.get('num_constraints')
+
+        self._log(f"📊 Variables: {num_variables}, Constraints: {num_constraints if num_constraints is not None else 'N/A'}")
+
         obj_value = optimization_result.get('objective_value')
         if obj_value is not None:
             self._log(f"🎯 Objective Value: {obj_value}")

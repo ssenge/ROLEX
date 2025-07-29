@@ -12,6 +12,7 @@ from typing import Dict, Any
 
 from .mps_base import BaseMPSSolver
 from models import MPSOptimizationResponse, SolverDiagnostics
+from .mps_parser_utils import get_mps_dimensions
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +95,13 @@ class CuOptMPSSolver(BaseMPSSolver):
         
         # Validate parameters
         validated_params = self._validate_parameters(parameters)
-        
+
+        # Get dimensions from MPS file
+        num_variables, num_constraints = get_mps_dimensions(mps_file_path)
+        if num_variables is None or num_constraints is None:
+            logger.warning(f"Could not determine MPS dimensions for {mps_file_path}. Setting to None.")
+            # Proceed with None, as the solver might still work
+
         # Create temporary output file
         temp_output = self._create_temp_output_file()
         
@@ -211,7 +218,8 @@ class CuOptMPSSolver(BaseMPSSolver):
                 solver=self.name,
                 message=message,
                 solver_info=solver_info,
-                num_constraints=None
+                num_variables=num_variables,
+                num_constraints=num_constraints
             )
             
         except Exception as e:
