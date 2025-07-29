@@ -350,7 +350,7 @@ Examples:
     )
     parser.add_argument(
         '--solver',
-        choices=['gurobi', 'cuopt'],
+        choices=['gurobi', 'cuopt', 'glop'],
         default='gurobi',
         help='Solver to use (default: gurobi)'
     )

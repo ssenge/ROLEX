@@ -24,6 +24,7 @@ class MPSSolverType(str, Enum):
     """Available MPS solver types"""
     GUROBI = "gurobi"
     CUOPT = "cuopt"
+    GLOP = "glop"
 
 
 class MPSOptimizationRequest(BaseModel):
