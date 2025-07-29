@@ -160,8 +160,12 @@ async def submit_mps_job(request: Request):
 
                 try:
                     # Execute gunzip to decompress the file
+                    import os
                     command = ["/usr/bin/gunzip", "-c", tmp_gz_file_path]
-                    process = subprocess.run(command, stdout=subprocess.PIPE, check=True)
+                    env = os.environ.copy()
+                    if "/usr/bin" not in env.get("PATH", ""):
+                        env["PATH"] = "/usr/bin:" + env.get("PATH", "")
+                    process = subprocess.run(command, stdout=subprocess.PIPE, check=True, env=env)
                     content = process.stdout
                     
                     # Write the decompressed content to the temporary MPS file
