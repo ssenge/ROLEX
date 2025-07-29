@@ -97,7 +97,11 @@ class CuOptMPSSolver(BaseMPSSolver):
         validated_params = self._validate_parameters(parameters)
 
         # Get dimensions from MPS file
+        mps_parse_start_time = time.time()
         num_variables, num_constraints = get_mps_dimensions(mps_file_path)
+        mps_parse_end_time = time.time()
+        logger.info(f"MPS parsing (pysmps) took {mps_parse_end_time - mps_parse_start_time:.4f} seconds for {os.path.basename(mps_file_path)}")
+
         if num_variables is None or num_constraints is None:
             logger.warning(f"Could not determine MPS dimensions for {mps_file_path}. Setting to None.")
             # Proceed with None, as the solver might still work

@@ -17,7 +17,10 @@ def get_mps_dimensions(mps_file_path: str) -> Tuple[Optional[int], Optional[int]
         if the file cannot be parsed or an error occurs.
     """
     try:
+        parse_start_time = time.time()
         model_data = smps.load_mps(mps_file_path)
+        parse_end_time = time.time()
+        logger.info(f"smps.load_mps took {parse_end_time - parse_start_time:.4f} seconds for {mps_file_path}")
 
         num_variables = len(model_data.get('col_names', []))
         num_constraints = len(model_data.get('row_names', []))
