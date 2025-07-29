@@ -128,7 +128,7 @@ class CuOptMPSSolver(BaseMPSSolver):
                 raise RuntimeError(f"cuOpt CLI failed with return code {result.returncode}: {result.stderr}")
             
             # Parse output
-            return self._parse_cuopt_output(temp_output, solve_time, validated_params)
+            return self._parse_cuopt_output(temp_output, solve_time, validated_params, num_variables, num_constraints)
             
         except subprocess.TimeoutExpired:
             raise RuntimeError("cuOpt CLI execution timed out")
@@ -162,7 +162,7 @@ class CuOptMPSSolver(BaseMPSSolver):
         logger.info(f"cuOpt CLI command: {' '.join(cmd)}")
         return cmd
     
-    def _parse_cuopt_output(self, output_file: str, solve_time: float, parameters: Dict[str, Any]) -> MPSOptimizationResponse:
+    def _parse_cuopt_output(self, output_file: str, solve_time: float, parameters: Dict[str, Any], num_variables: Optional[int], num_constraints: Optional[int]) -> MPSOptimizationResponse:
         """Parse cuOpt CLI output file"""
         
         if not os.path.exists(output_file):
