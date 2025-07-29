@@ -8,7 +8,7 @@ import subprocess
 import os
 import tempfile
 import uuid
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from .mps_base import BaseMPSSolver
 from models import MPSOptimizationResponse, SolverDiagnostics
