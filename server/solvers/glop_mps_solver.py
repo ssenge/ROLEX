@@ -88,7 +88,7 @@ class GlopMPSSolver(BaseMPSSolver):
             solver.enable_output(False) # Ensure output is disabled if not verbose
 
         if max_time is not None:
-            solver.set_time_limit(int(max_time * 1000)) # GLOP time limit is in milliseconds
+            solver.SetTimeLimit(int(max_time * 1000)) # GLOP time limit is in milliseconds
 
         solve_start_time = time.time()
         status = solver.solve(model)
