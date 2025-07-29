@@ -15,6 +15,7 @@ import logging
 from models import JobStatus, MPSSolverType, MPSOptimizationResponse, MPSJobStatusResponse, MPSOptimizationRequest
 from solvers.gurobi_mps_solver import GurobiMPSSolver
 from solvers.cuopt_mps_solver import CuOptMPSSolver
+from solvers.glop_mps_solver import GlopMPSSolver
 
 
 logger = logging.getLogger(__name__)
@@ -82,6 +83,13 @@ class JobManager:
             logger.info("cuOpt MPS solver initialized")
         except Exception as e:
             logger.error(f"Failed to initialize cuOpt MPS solver: {e}")
+
+        # GLOP MPS solver
+        try:
+            self.mps_solvers[MPSSolverType.GLOP] = GlopMPSSolver()
+            logger.info("GLOP MPS solver initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize GLOP MPS solver: {e}")
     
     def _log_solver_status(self):
         """Log the availability of all solvers"""
