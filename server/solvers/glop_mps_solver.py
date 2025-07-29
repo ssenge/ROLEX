@@ -134,7 +134,8 @@ class GlopMPSSolver(BaseMPSSolver):
                 solver_version=self._solver_version,
                 solve_status_code=status.value,
                 solve_status_message=str(status)
-            )
+            ),
+            num_constraints=model.num_constraints
         )
 
 

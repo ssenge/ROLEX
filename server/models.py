@@ -62,6 +62,7 @@ class MPSOptimizationResponse(BaseModel):
     variables: Dict[str, float] = {}
     solve_time: Optional[float] = None
     total_time: Optional[float] = None
+    num_constraints: Optional[int] = None
     solver: Optional[str] = None
     message: Optional[str] = None
     parameters_used: Dict[str, Any] = {}

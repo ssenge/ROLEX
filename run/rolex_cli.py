@@ -204,7 +204,7 @@ class RolexMPSCLI:
     def write_result_to_csv(self, result: Dict[str, Any], csv_path: str, input_filename: str, submission_timestamp: str, completion_timestamp: str, num_variables: int, solver_name: str, store_vars: bool = False):
         """Writes a single result to the specified CSV file."""
         
-        header = ['input_filename', 'job_id', 'solver_engine', 'solver_status', 'objective_value', 'time_to_solution', 'num_variables', 'submission_timestamp', 'completion_timestamp', 'variable_assignments']
+        header = ['input_filename', 'job_id', 'solver_engine', 'solver_status', 'objective_value', 'time_to_solution', 'num_variables', 'num_constraints', 'submission_timestamp', 'completion_timestamp', 'variable_assignments']
         
         file_exists = os.path.isfile(csv_path)
         
@@ -228,6 +228,7 @@ class RolexMPSCLI:
                 'objective_value': opt_result.get('objective_value'),
                 'time_to_solution': opt_result.get('solve_time'),
                 'num_variables': num_variables,
+                'num_constraints': result.get('result', {}).get('num_constraints'),
                 'submission_timestamp': submission_timestamp,
                 'completion_timestamp': completion_timestamp,
                 'variable_assignments': variable_assignments

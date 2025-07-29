@@ -210,7 +210,8 @@ class CuOptMPSSolver(BaseMPSSolver):
                 solve_time=solve_time,
                 solver=self.name,
                 message=message,
-                solver_info=solver_info
+                solver_info=solver_info,
+                num_constraints=None
             )
             
         except Exception as e:
