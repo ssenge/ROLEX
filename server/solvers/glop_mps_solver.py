@@ -54,11 +54,11 @@ class GlopMPSSolver(BaseMPSSolver):
                 "name": self.name,
                 "available": self.is_available(),
                 "version": self._solver_version,
-                "description": "Google's GLOP (Google Linear Optimization Package) solver for Linear Programs.",
+                "description": "Google's GLOP (Google Linear Optimization Package) solver for Linear Programs. Note: max_time and verbose parameters are not supported in this integration.",
                 "capabilities": ["LP"],
                 "parameters": {
-                    "max_time": "Maximum time in seconds for the solver to run.",
-                    "verbose": "Enable verbose output from the solver (boolean)."
+                    "max_time": "Not supported in this integration.",
+                    "verbose": "Not supported in this integration."
                 }
             }
         return self._solver_info
@@ -70,9 +70,9 @@ class GlopMPSSolver(BaseMPSSolver):
         if not self.is_available():
             raise RuntimeError("GLOP solver is not available.")
 
+        # Parameters are not directly supported by model_builder.ModelSolver for GLOP
+        # We still validate them to avoid unexpected behavior, but they won't be passed to the solver.
         validated_params = self._validate_parameters(parameters)
-        max_time = validated_params.get("max_time")
-        verbose = validated_params.get("verbose", False)
 
         model = model_builder.ModelBuilder()
         try:
@@ -81,14 +81,6 @@ class GlopMPSSolver(BaseMPSSolver):
             raise RuntimeError(f"Failed to import MPS file into GLOP: {e}")
 
         solver = model_builder.ModelSolver("GLOP")
-
-        if verbose:
-            solver.enable_output(True)
-        else:
-            solver.enable_output(False) # Ensure output is disabled if not verbose
-
-        if max_time is not None:
-            solver.SetTimeLimit(int(max_time * 1000)) # GLOP time limit is in milliseconds
 
         solve_start_time = time.time()
         status = solver.solve(model)
@@ -124,7 +116,7 @@ class GlopMPSSolver(BaseMPSSolver):
             logger.error("GLOP: Abnormal termination.")
         elif status == model_builder.SolveStatus.UNKNOWN_STATUS:
             solver_status = "failed"
-            logger.error("GLOP: Unknown status.")
+            logger.error(f"GLOP: Unknown status.")
         else:
             solver_status = "failed"
             logger.error(f"GLOP: Unexpected solve status: {status}")
@@ -142,3 +134,4 @@ class GlopMPSSolver(BaseMPSSolver):
                 solve_status_message=str(status)
             )
         )
+
