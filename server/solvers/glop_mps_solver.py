@@ -94,12 +94,14 @@ class GlopMPSSolver(BaseMPSSolver):
         if status == model_builder.SolveStatus.OPTIMAL:
             solver_status = "optimal"
             objective_value = solver.objective_value
-            for var in model.all_variables():
+            for i in range(model.num_variables):
+                var = model.var_from_index(i)
                 variables[var.name] = solver.value(var)
         elif status == model_builder.SolveStatus.FEASIBLE:
             solver_status = "feasible"
             objective_value = solver.objective_value
-            for var in model.all_variables():
+            for i in range(model.num_variables):
+                var = model.var_from_index(i)
                 variables[var.name] = solver.value(var)
         elif status == model_builder.SolveStatus.INFEASIBLE:
             solver_status = "infeasible"
