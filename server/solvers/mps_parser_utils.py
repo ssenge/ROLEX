@@ -2,13 +2,14 @@ import logging
 import time
 from typing import Optional, Tuple
 
-from pysmps import smps_loader as smps
+import gurobipy as gp
+from gurobipy import GurobiError
 
 logger = logging.getLogger(__name__)
 
 def get_mps_dimensions(mps_file_path: str) -> Tuple[Optional[int], Optional[int]]:
     """
-    Parses an MPS file to extract the number of variables and constraints.
+    Parses an MPS file to extract the number of variables and constraints using Gurobi.
 
     Args:
         mps_file_path: The absolute path to the MPS file.
@@ -19,15 +20,18 @@ def get_mps_dimensions(mps_file_path: str) -> Tuple[Optional[int], Optional[int]
     """
     try:
         parse_start_time = time.time()
-        model_data = smps.load_mps(mps_file_path)
+        model = gp.read(mps_file_path)
         parse_end_time = time.time()
-        logger.info(f"smps.load_mps took {parse_end_time - parse_start_time:.4f} seconds for {mps_file_path}")
+        logger.info(f"Gurobi MPS read took {parse_end_time - parse_start_time:.4f} seconds for {mps_file_path}")
 
-        num_variables = len(model_data.get('col_names', []))
-        num_constraints = len(model_data.get('row_names', []))
+        num_variables = model.NumVars
+        num_constraints = model.NumConstrs
 
         return num_variables, num_constraints
 
+    except GurobiError as e:
+        logger.error(f"GurobiError parsing MPS file {mps_file_path}: {e}")
+        return None, None
     except FileNotFoundError:
         logger.error(f"MPS file not found: {mps_file_path}")
         return None, None
