@@ -204,7 +204,7 @@ class RolexMPSCLI:
     def write_result_to_csv(self, result: Dict[str, Any], csv_path: str, input_filename: str, submission_timestamp: str, completion_timestamp: str, num_variables: int, solver_name: str, store_vars: bool = False):
         """Writes a single result to the specified CSV file."""
         
-        header = ['input_filename', 'job_id', 'solver_engine', 'solver_status', 'objective_value', 'time_to_solution', 'num_variables', 'num_constraints', 'submission_timestamp', 'completion_timestamp', 'variable_assignments']
+        header = ['input_filename', 'job_id', 'solver_engine', 'solver_status', 'objective_value', 'time_to_solution', 'num_variables', 'num_constraints', 'submission_timestamp', 'completion_timestamp', 'log_interval_s', 'convergence_objectives', 'variable_assignments']
         
         file_exists = os.path.isfile(csv_path)
         
@@ -215,10 +215,17 @@ class RolexMPSCLI:
                 writer.writeheader()
 
             opt_result = result.get('result', {})
+            params_used = opt_result.get('parameters_used', {})
             
+            # Get variable assignments if requested by the user
             variable_assignments = ""
             if store_vars:
                 variable_assignments = ";".join([f"{k}={v}" for k, v in opt_result.get('variables', {}).items()])
+
+            # Get convergence data if it exists in the result
+            convergence_objectives = ""
+            if opt_result and 'convergence_data' in opt_result and opt_result['convergence_data']:
+                convergence_objectives = ";".join([str(p['objective']) for p in opt_result['convergence_data']])
 
             row = {
                 'input_filename': input_filename,
@@ -228,9 +235,11 @@ class RolexMPSCLI:
                 'objective_value': opt_result.get('objective_value'),
                 'time_to_solution': opt_result.get('solve_time'),
                 'num_variables': num_variables,
-                'num_constraints': result.get('result', {}).get('num_constraints'),
+                'num_constraints': opt_result.get('num_constraints'),
                 'submission_timestamp': submission_timestamp,
                 'completion_timestamp': completion_timestamp,
+                'log_interval_s': params_used.get('log_frequency'),
+                'convergence_objectives': convergence_objectives,
                 'variable_assignments': variable_assignments
             }
             writer.writerow(row)
@@ -267,6 +276,14 @@ class RolexMPSCLI:
         if solve_time is not None:
             self._log(f"⏱️  Solve Time: {solve_time:.4f}s")
         
+        if optimization_result.get('convergence_data'):
+            self._log(f"\n--- Convergence Data ---")
+            self._log(f"Time (s)    Objective")
+            self._log(f"--------------------------")
+            for point in optimization_result['convergence_data']:
+                self._log(f"{point['time']:<12.2f}{point['objective']}")
+            self._log(f"--------------------------")
+
         if show_vars:
             variables = optimization_result.get('variables', {})
             if variables:
@@ -384,6 +401,11 @@ Examples:
         help='Gap tolerance (0.0 to 1.0)'
     )
     parser.add_argument(
+        '--log-frequency',
+        type=int,
+        help='Log convergence data every N seconds'
+    )
+    parser.add_argument(
         '--verbose',
         action='store_true',
         help='Enable verbose output for each job.'
@@ -416,6 +438,8 @@ Examples:
         kwargs['threads'] = args.threads
     if args.gap:
         kwargs['gap_tolerance'] = args.gap
+    if args.log_frequency:
+        kwargs['log_frequency'] = args.log_frequency
     if args.verbose:
         kwargs['verbose'] = True
 

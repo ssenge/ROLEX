@@ -74,13 +74,32 @@ class GurobiMPSSolver(BaseMPSSolver):
             # Set parameters
             self._set_gurobi_parameters(model, validated_params)
             
+            # Data for convergence tracking
+            convergence_data = []
+            last_log_time = -float('inf')
+
+            def _callback(model, where):
+                nonlocal last_log_time
+                if where == GRB.Callback.MIPNODE:
+                    # Check if a new solution has been found
+                    if model.cbGet(GRB.Callback.MIPNODE_STATUS) == GRB.OPTIMAL:
+                        current_time = time.time() - start_time
+                        log_frequency = validated_params.get('log_frequency')
+
+                        if log_frequency and (current_time - last_log_time) >= log_frequency:
+                            obj_val = model.cbGet(GRB.Callback.MIPNODE_OBJBST)
+                            convergence_data.append({'time': current_time, 'objective': obj_val})
+                            last_log_time = current_time
+
             # Solve
             start_time = time.time()
-            model.optimize()
+            model.optimize(callback=_callback if validated_params.get('log_frequency') else None)
             solve_time = time.time() - start_time
             
             # Process results
-            return self._process_gurobi_results(model, solve_time, validated_params)
+            response = self._process_gurobi_results(model, solve_time, validated_params)
+            response.convergence_data = convergence_data
+            return response
             
         except Exception as e:
             logger.error(f"Gurobi MPS solve failed: {str(e)}")

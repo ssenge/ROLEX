@@ -55,6 +55,12 @@ class SolverDiagnostics(BaseModel):
     status_code: Optional[int] = None
 
 
+class ConvergencePoint(BaseModel):
+    """Data point for convergence analysis"""
+    time: float
+    objective: float
+
+
 class MPSOptimizationResponse(BaseModel):
     """Response containing MPS optimization results"""
     status: str
@@ -67,6 +73,7 @@ class MPSOptimizationResponse(BaseModel):
     message: Optional[str] = None
     parameters_used: Dict[str, Any] = {}
     solver_info: SolverDiagnostics = SolverDiagnostics()
+    convergence_data: Optional[List[ConvergencePoint]] = None
     
     class Config:
         schema_extra = {
