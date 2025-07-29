@@ -160,7 +160,6 @@ async def submit_mps_job(request: Request):
 
                 try:
                     # Execute gunzip to decompress the file
-                    import os
                     command = ["/usr/bin/gunzip", "-c", tmp_gz_file_path]
                     env = os.environ.copy()
                     if "/usr/bin" not in env.get("PATH", ""):
