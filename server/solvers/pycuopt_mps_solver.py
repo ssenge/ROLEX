@@ -96,7 +96,7 @@ class PyCuOptMPSSolver(BaseMPSSolver):
                 convergence_data = [ConvergencePoint(time=0, objective=obj) for obj in lp_objectives]
 
             # Process the results
-            response = self._process_cuopt_results(solution, solve_time, data_model)
+            response = self._process_cuopt_results(solution, solve_time, data_model, validated_params)
             response.convergence_data = convergence_data
             return response
 
@@ -128,7 +128,7 @@ class PyCuOptMPSSolver(BaseMPSSolver):
             logger.warning(f"Could not parse LP log file {log_path}: {e}")
         return objectives
 
-    def _process_cuopt_results(self, solution, solve_time: float, data_model) -> MPSOptimizationResponse:
+    def _process_cuopt_results(self, solution, solve_time: float, data_model, parameters: Dict[str, Any]) -> MPSOptimizationResponse:
         status_map = { 0: "optimal", 1: "optimal", 2: "time_limit", 3: "interrupted", -1: "infeasible", -2: "unbounded", -3: "failed" }
         raw_status = solution.get_termination_status()
         status = status_map.get(raw_status, "unknown")
@@ -146,7 +146,8 @@ class PyCuOptMPSSolver(BaseMPSSolver):
             message=message,
             solver_info=solver_info,
             num_constraints=len(data_model.b),
-            num_variables=len(data_model.c)
+            num_variables=len(data_model.c),
+            parameters_used=parameters
         )
 
     def _validate_parameters(self, parameters: Dict[str, Any]) -> Dict[str, Any]:

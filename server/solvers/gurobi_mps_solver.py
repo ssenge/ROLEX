@@ -199,7 +199,8 @@ class GurobiMPSSolver(BaseMPSSolver):
             solver=self.name,
             message=message,
             solver_info=solver_info,
-            num_constraints=model.NumConstrs
+            num_constraints=model.NumConstrs,
+            parameters_used=parameters
         )
     
     def _validate_parameters(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
