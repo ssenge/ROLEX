@@ -59,7 +59,7 @@ class PyCuOptMPSSolver(BaseMPSSolver):
                 settings.set_parameter(CUOPT_TIME_LIMIT, validated_params['max_time'])
 
             convergence_data = []
-            is_mip = "I" in data_model.get_variable_types()
+            is_mip = "I" in data_model.variable_types
 
             if is_mip and 'log_frequency' in validated_params:
                 # --- MIP Strategy: Use Incumbent Callback ---
@@ -145,8 +145,8 @@ class PyCuOptMPSSolver(BaseMPSSolver):
             solver=self.name,
             message=message,
             solver_info=solver_info,
-            num_constraints=data_model.get_number_of_constraints(),
-            num_variables=data_model.get_number_of_variables()
+            num_constraints=len(data_model.b),
+            num_variables=len(data_model.c)
         )
 
     def _validate_parameters(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
