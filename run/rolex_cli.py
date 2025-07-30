@@ -75,6 +75,7 @@ class RolexMPSCLI:
         self._log(f"🚀 Job {job_id} submitted to {solver.upper()} solver for file {os.path.basename(mps_file_path)}")
         
         result = self._poll_for_results(job_id)
+        self._log(f"DEBUG: Result from server: {result}")
         
         return result
 

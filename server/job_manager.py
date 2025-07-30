@@ -222,6 +222,8 @@ class JobManager:
             print(f"=== DEBUG: Calling solve_with_timing ===")
             result = solver.solve_with_timing(job.mps_file_path, job.parameters)
             print(f"=== DEBUG: solve_with_timing completed with status: {result.status} ===")
+            logger.debug(f"Job {job_id} convergence_data: {result.convergence_data}")
+            logger.debug(f"Job {job_id} parameters_used: {result.parameters_used}")
             
             # Update job with result
             with self.lock:
