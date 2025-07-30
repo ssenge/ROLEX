@@ -96,6 +96,12 @@ class CuOptMPSSolver(BaseMPSSolver):
         # Validate parameters
         validated_params = self._validate_parameters(parameters)
 
+        # cuOpt CLI does not support --log-frequency, so remove it if present
+        # The log file is created based on its presence, but the CLI itself doesn't take it as an argument.
+        cuopt_cli_params = validated_params.copy()
+        if 'log_frequency' in cuopt_cli_params:
+            del cuopt_cli_params['log_frequency']
+
         # Get dimensions from MPS file
         mps_parse_start_time = time.time()
         num_variables, num_constraints = get_mps_dimensions(mps_file_path)
@@ -112,7 +118,7 @@ class CuOptMPSSolver(BaseMPSSolver):
         
         try:
             # Build cuOpt CLI command
-            cmd = self._build_cuopt_command(mps_file_path, temp_output, validated_params, log_file=temp_log)
+            cmd = self._build_cuopt_command(mps_file_path, temp_output, cuopt_cli_params, log_file=temp_log)
             
             # Execute cuOpt CLI
             start_time = time.time()
@@ -189,9 +195,8 @@ class CuOptMPSSolver(BaseMPSSolver):
         cmd.extend(['--solution-file', output_file])
 
         # Add log file if specified
-        if log_file and 'log_frequency' in parameters:
+        if log_file:
             cmd.extend(['--log-file', log_file])
-            cmd.extend(['--log-frequency', str(parameters['log_frequency'])])
         
         # Add MPS file path
         cmd.append(mps_file_path)
@@ -294,8 +299,5 @@ class CuOptMPSSolver(BaseMPSSolver):
         # Ensure max_time is reasonable (cuOpt CLI expects integer seconds)
         if 'max_time' in validated:
             validated['max_time'] = max(1, int(validated['max_time']))
-        
-        if 'log_frequency' in parameters:
-            validated['log_frequency'] = max(1, int(parameters['log_frequency']))
 
         return validated 
