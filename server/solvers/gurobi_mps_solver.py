@@ -66,6 +66,7 @@ class GurobiMPSSolver(BaseMPSSolver):
         
         # Validate parameters
         validated_params = self._validate_parameters(parameters)
+        print(f"--- Gurobi: validated_params after validation: {validated_params} ---")
         
         try:
             # Read MPS file
@@ -123,8 +124,12 @@ class GurobiMPSSolver(BaseMPSSolver):
 
             # Solve
             start_time = time.time()
-            print(f"--- Gurobi: Calling model.optimize with callback: {_callback if validated_params.get('log_frequency') else None} ---")
-            model.optimize(callback=_callback if validated_params.get('log_frequency') else None)
+            callback_to_use = None
+            print(f"--- Gurobi: validated_params.get('log_frequency') = {validated_params.get('log_frequency')} ---")
+            if validated_params.get('log_frequency') and validated_params['log_frequency'] > 0:
+                callback_to_use = _callback
+            print(f"--- Gurobi: Calling model.optimize with callback: {callback_to_use} ---")
+            model.optimize(callback=callback_to_use)
             solve_time = time.time() - start_time
             
             # Process results
