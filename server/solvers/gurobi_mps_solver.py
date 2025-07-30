@@ -109,8 +109,17 @@ class GurobiMPSSolver(BaseMPSSolver):
                             obj_val = raw_obj_val
                     elif where == GRB.Callback.MESSAGE:
                         msg = model.cbGet(GRB.Callback.MSG_STRING)
-                        if msg: # Don't print empty messages
-                            print(f"*** GUROBI LOG (where=6): {msg.strip()}")
+                        if msg:
+                            parts = msg.strip().split()
+                            if len(parts) > 1:
+                                try:
+                                    # Assuming the second part is the objective value
+                                    obj_val = float(parts[1])
+                                except ValueError:
+                                    # Log if parsing fails, but don't stop
+                                    print(f"*** GUROBI LOG (where=6): Could not parse objective from: {msg.strip()}")
+                            else:
+                                print(f"*** GUROBI LOG (where=6): {msg.strip()}")
 
                     if obj_val is not None:
                         convergence_data.append({'time': current_time, 'objective': obj_val})
