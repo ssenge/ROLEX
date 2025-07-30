@@ -81,16 +81,33 @@ class GurobiMPSSolver(BaseMPSSolver):
             def _callback(model, where):
                 nonlocal last_log_time
                 if where == GRB.Callback.MIPNODE:
-                    # Check if a new solution has been found
-                    if model.cbGet(GRB.Callback.MIPNODE_STATUS) == GRB.OPTIMAL:
-                        current_time = time.time() - start_time
-                        log_frequency = validated_params.get('log_frequency')
+                    # Log best objective found so far at MIP nodes
+                    current_time = time.time() - start_time
+                    log_frequency = validated_params.get('log_frequency')
 
-                        if log_frequency and (current_time - last_log_time) >= log_frequency:
+                    if log_frequency and (current_time - last_log_time) >= log_frequency:
+                        # Check if an objective best value is available
+                        if model.cbGet(GRB.Callback.MIPNODE_OBJBST) is not None:
                             obj_val = model.cbGet(GRB.Callback.MIPNODE_OBJBST)
                             convergence_data.append({'time': current_time, 'objective': obj_val})
                             last_log_time = current_time
-                        logger.debug(f"Gurobi Callback: where={where}, status={model.cbGet(GRB.Callback.MIPNODE_STATUS)}, current_time={current_time}, last_log_time={last_log_time}, log_frequency={log_frequency}, obj_val={obj_val if 'obj_val' in locals() else 'N/A'}")
+                            logger.debug(f"Gurobi Callback: where={where}, status={model.cbGet(GRB.Callback.MIPNODE_STATUS)}, current_time={current_time}, last_log_time={last_log_time}, log_frequency={log_frequency}, obj_val={obj_val}")
+                        else:
+                            logger.debug(f"Gurobi Callback: MIPNODE_OBJBST not available at time {current_time}")
+                elif where == GRB.Callback.BARRIER:
+                    # Log objective for Barrier method (LP)
+                    current_time = time.time() - start_time
+                    log_frequency = validated_params.get('log_frequency')
+
+                    if log_frequency and (current_time - last_log_time) >= log_frequency:
+                        # Check if an objective value is available
+                        if model.cbGet(GRB.Callback.BARRIER_OBJVAL) is not None:
+                            obj_val = model.cbGet(GRB.Callback.BARRIER_OBJVAL)
+                            convergence_data.append({'time': current_time, 'objective': obj_val})
+                            last_log_time = current_time
+                            logger.debug(f"Gurobi Callback: where={where}, current_time={current_time}, last_log_time={last_log_time}, log_frequency={log_frequency}, obj_val={obj_val}")
+                        else:
+                            logger.debug(f"Gurobi Callback: BARRIER_OBJVAL not available at time {current_time}")
 
             # Solve
             start_time = time.time()
