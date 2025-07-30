@@ -275,6 +275,7 @@ async def get_mps_job_status(job_id: str):
     
     try:
         job_status = await solver_manager.get_mps_job_status(job_id)
+        logger.debug(f"Returning job status for {job_id}: {job_status.dict()}")
         return job_status
     except KeyError:
         raise HTTPException(status_code=404, detail="Job not found")
