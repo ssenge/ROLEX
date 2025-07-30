@@ -123,6 +123,7 @@ class GurobiMPSSolver(BaseMPSSolver):
 
             # Solve
             start_time = time.time()
+            print(f"--- Gurobi: Calling model.optimize with callback: {_callback if validated_params.get('log_frequency') else None} ---")
             model.optimize(callback=_callback if validated_params.get('log_frequency') else None)
             solve_time = time.time() - start_time
             
