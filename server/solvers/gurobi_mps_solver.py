@@ -79,35 +79,47 @@ class GurobiMPSSolver(BaseMPSSolver):
             last_log_time = -float('inf')
 
             def _callback(model, where):
+                print(f"--- Gurobi Callback Entered: where={where} ---")
                 nonlocal last_log_time
-                if where == GRB.Callback.MIPNODE:
-                    # Log best objective found so far at MIP nodes
-                    current_time = time.time() - start_time
-                    log_frequency = validated_params.get('log_frequency')
+                log_frequency = validated_params.get('log_frequency')
+                
+                logger.debug(f"Gurobi Callback triggered: where={where}, log_frequency={log_frequency}")
 
-                    if log_frequency and (current_time - last_log_time) >= log_frequency:
-                        # Check if an objective best value is available
-                        if model.cbGet(GRB.Callback.MIPNODE_OBJBST) is not None:
-                            obj_val = model.cbGet(GRB.Callback.MIPNODE_OBJBST)
-                            convergence_data.append({'time': current_time, 'objective': obj_val})
-                            last_log_time = current_time
-                            logger.debug(f"Gurobi Callback: where={where}, status={model.cbGet(GRB.Callback.MIPNODE_STATUS)}, current_time={current_time}, last_log_time={last_log_time}, log_frequency={log_frequency}, obj_val={obj_val}")
-                        else:
-                            logger.debug(f"Gurobi Callback: MIPNODE_OBJBST not available at time {current_time}")
-                elif where == GRB.Callback.BARRIER:
-                    # Log objective for Barrier method (LP)
-                    current_time = time.time() - start_time
-                    log_frequency = validated_params.get('log_frequency')
+                if not log_frequency:
+                    logger.debug("Gurobi Callback: log_frequency not set, returning.")
+                    return # No log frequency set, do nothing
 
-                    if log_frequency and (current_time - last_log_time) >= log_frequency:
-                        # Check if an objective value is available
-                        if model.cbGet(GRB.Callback.BARRIER_PRIMOBJ) is not None:
-                            obj_val = model.cbGet(GRB.Callback.BARRIER_PRIMOBJ)
-                            convergence_data.append({'time': current_time, 'objective': obj_val})
-                            last_log_time = current_time
-                            logger.debug(f"Gurobi Callback: where={where}, current_time={current_time}, last_log_time={last_log_time}, log_frequency={log_frequency}, obj_val={obj_val}")
+                current_time = time.time() - start_time
+                time_diff = current_time - last_log_time
+                logger.debug(f"Gurobi Callback: current_time={current_time:.2f}, last_log_time={last_log_time:.2f}, time_diff={time_diff:.2f}")
+                
+                if time_diff >= log_frequency:
+                    obj_val = None
+                    if where == GRB.Callback.MIPNODE:
+                        raw_obj_val = model.cbGet(GRB.Callback.MIPNODE_OBJBST)
+                        logger.debug(f"Gurobi Callback (MIPNODE): raw_obj_val={raw_obj_val}")
+                        if raw_obj_val is not None:
+                            obj_val = raw_obj_val
+                            logger.debug(f"Gurobi Callback (MIPNODE): time={current_time:.2f}, obj={obj_val}, status={model.cbGet(GRB.Callback.MIPNODE_STATUS)}")
                         else:
-                            logger.debug(f"Gurobi Callback: BARRIER_OBJVAL not available at time {current_time}")
+                            logger.debug(f"Gurobi Callback (MIPNODE): MIPNODE_OBJBST not available at time {current_time:.2f}")
+                    elif where == GRB.Callback.BARRIER:
+                        raw_obj_val = model.cbGet(GRB.Callback.BARRIER_PRIMOBJ)
+                        logger.debug(f"Gurobi Callback (BARRIER): raw_obj_val={raw_obj_val}")
+                        if raw_obj_val is not None:
+                            obj_val = raw_obj_val
+                            logger.debug(f"Gurobi Callback (BARRIER): time={current_time:.2f}, obj={obj_val}")
+                        else:
+                            logger.debug(f"Gurobi Callback (BARRIER): BARRIER_PRIMOBJ not available at time {current_time:.2f}")
+                    
+                    if obj_val is not None:
+                        convergence_data.append({'time': current_time, 'objective': obj_val})
+                        logger.debug(f"Gurobi Callback: Appended data: {{'time': {current_time:.2f}, 'objective': {obj_val}}}")
+                    
+                    last_log_time = current_time # Always update last_log_time to ensure next log is correctly timed
+                    logger.debug(f"Gurobi Callback: Updated last_log_time to {last_log_time:.2f}")
+                else:
+                    logger.debug(f"Gurobi Callback: Skipping log (time diff {time_diff:.2f} < {log_frequency})")
 
             # Solve
             start_time = time.time()
