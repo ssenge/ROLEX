@@ -74,6 +74,7 @@ class PyCuOptMPSSolver(BaseMPSSolver):
                             cost = solution_cost.copy_to_host()[0]
                             convergence_data.append(ConvergencePoint(time=current_time, objective=cost))
                             last_log_time = current_time
+                            logger.debug(f"PyCuOpt MIP Callback: current_time={current_time}, cost={cost}, log_frequency={validated_params['log_frequency']}")
                 
                 settings.set_mip_callback(CustomGetSolutionCallback())
                 start_time_mip = time.time()

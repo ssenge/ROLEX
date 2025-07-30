@@ -90,6 +90,7 @@ class GurobiMPSSolver(BaseMPSSolver):
                             obj_val = model.cbGet(GRB.Callback.MIPNODE_OBJBST)
                             convergence_data.append({'time': current_time, 'objective': obj_val})
                             last_log_time = current_time
+                        logger.debug(f"Gurobi Callback: where={where}, status={model.cbGet(GRB.Callback.MIPNODE_STATUS)}, current_time={current_time}, last_log_time={last_log_time}, log_frequency={log_frequency}, obj_val={obj_val if 'obj_val' in locals() else 'N/A'}")
 
             # Solve
             start_time = time.time()
