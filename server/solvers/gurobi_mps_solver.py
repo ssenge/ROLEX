@@ -101,8 +101,8 @@ class GurobiMPSSolver(BaseMPSSolver):
 
                     if log_frequency and (current_time - last_log_time) >= log_frequency:
                         # Check if an objective value is available
-                        if model.cbGet(GRB.Callback.BARRIER_OBJVAL) is not None:
-                            obj_val = model.cbGet(GRB.Callback.BARRIER_OBJVAL)
+                        if model.cbGet(GRB.Callback.BARRIER_PRIMOBJ) is not None:
+                            obj_val = model.cbGet(GRB.Callback.BARRIER_PRIMOBJ)
                             convergence_data.append({'time': current_time, 'objective': obj_val})
                             last_log_time = current_time
                             logger.debug(f"Gurobi Callback: where={where}, current_time={current_time}, last_log_time={last_log_time}, log_frequency={log_frequency}, obj_val={obj_val}")
