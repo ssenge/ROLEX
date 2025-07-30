@@ -95,13 +95,26 @@ class GurobiMPSSolver(BaseMPSSolver):
                         raw_obj_val = model.cbGet(GRB.Callback.MIPNODE_OBJBST)
                         if raw_obj_val is not None:
                             obj_val = raw_obj_val
+                    elif where == GRB.Callback.MIPSOL:
+                        raw_obj_val = model.cbGet(GRB.Callback.MIPSOL_OBJ)
+                        if raw_obj_val is not None:
+                            obj_val = raw_obj_val
                     elif where == GRB.Callback.BARRIER:
                         raw_obj_val = model.cbGet(GRB.Callback.BARRIER_PRIMOBJ)
                         if raw_obj_val is not None:
                             obj_val = raw_obj_val
-                    
+                    elif where == GRB.Callback.SIMPLEX:
+                        raw_obj_val = model.cbGet(GRB.Callback.SPX_OBJVAL)
+                        if raw_obj_val is not None:
+                            obj_val = raw_obj_val
+                    elif where == GRB.Callback.MESSAGE:
+                        msg = model.cbGet(GRB.Callback.MSG_STRING)
+                        if msg: # Don't print empty messages
+                            print(f"*** GUROBI LOG (where=6): {msg.strip()}")
+
                     if obj_val is not None:
                         convergence_data.append({'time': current_time, 'objective': obj_val})
+                        print(f"*** =============> Objective {obj_val} captured at time {current_time:.2f}s from where={where}")
                     
                     last_log_time = current_time # Always update last_log_time to ensure next log is correctly timed
 
@@ -115,6 +128,7 @@ class GurobiMPSSolver(BaseMPSSolver):
             
             # Process results
             response = self._process_gurobi_results(model, solve_time, validated_params)
+            print(f"=============> Convergence data: {convergence_data}")
             response.convergence_data = convergence_data
             return response
             
