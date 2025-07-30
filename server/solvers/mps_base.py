@@ -167,6 +167,11 @@ class BaseMPSSolver(ABC):
         if 'verbose' in parameters:
             validated['verbose'] = bool(parameters['verbose'])
         
+        if 'log_frequency' in parameters:
+            log_freq = parameters['log_frequency']
+            if isinstance(log_freq, (int, float)) and log_freq > 0:
+                validated['log_frequency'] = float(log_freq)
+
         return validated
     
     def __str__(self) -> str:
