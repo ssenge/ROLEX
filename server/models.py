@@ -25,6 +25,7 @@ class MPSSolverType(str, Enum):
     GUROBI = "gurobi"
     CUOPT = "cuopt"
     GLOP = "glop"
+    PYCUOPT = "pycuopt"
 
 
 class MPSOptimizationRequest(BaseModel):

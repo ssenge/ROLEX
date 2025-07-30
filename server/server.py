@@ -24,6 +24,7 @@ from models import (
     SERVER_NAME, SERVER_VERSION, SERVER_DESCRIPTION
 )
 from job_manager import JobManager
+from .solvers.pycuopt_mps_solver import PyCuOptMPSSolver
 
 # Configure logging (output goes to stdout/stderr, captured by management script)
 logging.basicConfig(

@@ -374,7 +374,7 @@ Examples:
     )
     parser.add_argument(
         '--solver',
-        choices=['gurobi', 'cuopt', 'glop'],
+        choices=['gurobi', 'cuopt', 'glop', 'pycuopt'],
         default='gurobi',
         help='Solver to use (default: gurobi)'
     )
