@@ -6,6 +6,8 @@ import time
 import logging
 import os
 import tempfile
+import sys
+import io
 from typing import Dict, Any, Optional, List
 
 from .mps_base import BaseMPSSolver
@@ -29,6 +31,7 @@ class PyCuOptMPSSolver(BaseMPSSolver):
 
     def __init__(self):
         super().__init__("pyCuOpt")
+        self.last_lp_log_path = None
 
     def is_available(self) -> bool:
         return CUOPT_AVAILABLE
@@ -80,21 +83,27 @@ class PyCuOptMPSSolver(BaseMPSSolver):
                 start_time_mip = time.time()
 
             elif not is_mip:
-                # --- LP Strategy: Use Log File Parsing ---
-                temp_fd, temp_log_path = tempfile.mkstemp(suffix='.log', prefix='cuopt_lp_log_')
+                # --- LP Strategy: Redirect Console Log to File ---
+                settings.set_parameter(CUOPT_LOG_TO_CONSOLE, True)
+                
+                temp_fd, self.last_lp_log_path = tempfile.mkstemp(suffix='.log', prefix='cuopt_lp_console_log_')
                 os.close(temp_fd)
-                settings.set_parameter(CUOPT_LOG_FILE, temp_log_path)
+                
+                # Store original stdout/stderr
+                _original_stdout = sys.stdout
+                _original_stderr = sys.stderr
+                
+                # Redirect stdout/stderr to the temporary file
+                sys.stdout = open(self.last_lp_log_path, 'w')
+                sys.stderr = open(self.last_lp_log_path, 'w')
 
             # Solve the problem
             solve_start_time = time.time()
             solution = solver.Solve(data_model, settings)
             solve_time = time.time() - solve_start_time
 
-            # If it was an LP, parse the log file now
-            if temp_log_path:
-                lp_objectives = self._parse_lp_log(temp_log_path)
-                # For LPs, we don't have precise timestamps, so time is 0
-                convergence_data = [ConvergencePoint(time=0, objective=obj) for obj in lp_objectives]
+            # For LPs, intermediate convergence data will be in the redirected log file.
+            # For MIPs, convergence_data is populated by the callback.
 
             # Process the results
             response = self._process_cuopt_results(solution, solve_time, data_model, validated_params)
@@ -105,29 +114,15 @@ class PyCuOptMPSSolver(BaseMPSSolver):
             logger.error(f"cuOpt Python API solve failed: {str(e)}")
             raise RuntimeError(f"cuOpt solve failed: {str(e)}")
         finally:
-            if temp_log_path and os.path.exists(temp_log_path):
-                os.remove(temp_log_path)
-
-    def _parse_lp_log(self, log_path: str) -> List[float]:
-        """Best-effort parsing of a cuOpt LP log file for objective values."""
-        objectives = []
-        try:
-            with open(log_path, 'r') as f:
-                for line in f:
-                    # This is a heuristic based on observed log formats.
-                    # It looks for lines from the PDLP solver's progress table.
-                    if 'primal_objective' in line and 'dual_objective' in line:
-                        try:
-                            parts = line.split()
-                            # Find the index for primal_objective and extract the value
-                            obj_index = parts.index('primal_objective') + 2 # The value is usually 2 positions after the label
-                            if obj_index < len(parts):
-                                objectives.append(float(parts[obj_index]))
-                        except (ValueError, IndexError):
-                            continue # Ignore lines that don't match the expected format
-        except Exception as e:
-            logger.warning(f"Could not parse LP log file {log_path}: {e}")
-        return objectives
+            # Ensure stdout/stderr are restored
+            if not is_mip and '_original_stdout' in locals():
+                if sys.stdout != _original_stdout: # Check if it was redirected
+                    sys.stdout.close()
+                if sys.stderr != _original_stderr: # Check if it was redirected
+                    sys.stderr.close()
+                sys.stdout = _original_stdout
+                sys.stderr = _original_stderr
+            # The temporary log file is NOT removed here, so the user can inspect it.
 
     def _process_cuopt_results(self, solution, solve_time: float, data_model, parameters: Dict[str, Any]) -> MPSOptimizationResponse:
         status_map = { 0: "optimal", 1: "optimal", 2: "time_limit", 3: "interrupted", -1: "infeasible", -2: "unbounded", -3: "failed" }
