@@ -83,19 +83,19 @@ class PyCuOptMPSSolver(BaseMPSSolver):
                 start_time_mip = time.time()
 
             elif not is_mip:
-                # --- LP Strategy: Redirect Console Log to File ---
+                # --- LP Strategy: Redirect Console Log to File (using file descriptors) ---
                 settings.set_parameter(CUOPT_LOG_TO_CONSOLE, True)
                 
                 temp_fd, self.last_lp_log_path = tempfile.mkstemp(suffix='.log', prefix='cuopt_lp_console_log_')
-                os.close(temp_fd)
                 
-                # Store original stdout/stderr
-                _original_stdout = sys.stdout
-                _original_stderr = sys.stderr
+                # Save original stdout/stderr file descriptors
+                _original_stdout_fd = os.dup(sys.stdout.fileno())
+                _original_stderr_fd = os.dup(sys.stderr.fileno())
                 
                 # Redirect stdout/stderr to the temporary file
-                sys.stdout = open(self.last_lp_log_path, 'w')
-                sys.stderr = open(self.last_lp_log_path, 'w')
+                os.dup2(temp_fd, sys.stdout.fileno())
+                os.dup2(temp_fd, sys.stderr.fileno())
+                os.close(temp_fd) # Close the temporary file descriptor after redirection
 
             # Solve the problem
             solve_start_time = time.time()
@@ -115,13 +115,11 @@ class PyCuOptMPSSolver(BaseMPSSolver):
             raise RuntimeError(f"cuOpt solve failed: {str(e)}")
         finally:
             # Ensure stdout/stderr are restored
-            if not is_mip and '_original_stdout' in locals():
-                if sys.stdout != _original_stdout: # Check if it was redirected
-                    sys.stdout.close()
-                if sys.stderr != _original_stderr: # Check if it was redirected
-                    sys.stderr.close()
-                sys.stdout = _original_stdout
-                sys.stderr = _original_stderr
+            if not is_mip and '_original_stdout_fd' in locals():
+                os.dup2(_original_stdout_fd, sys.stdout.fileno())
+                os.dup2(_original_stderr_fd, sys.stderr.fileno())
+                os.close(_original_stdout_fd)
+                os.close(_original_stderr_fd)
             # The temporary log file is NOT removed here, so the user can inspect it.
 
     def _process_cuopt_results(self, solution, solve_time: float, data_model, parameters: Dict[str, Any]) -> MPSOptimizationResponse:
