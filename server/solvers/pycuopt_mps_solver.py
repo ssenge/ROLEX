@@ -103,6 +103,11 @@ class PyCuOptMPSSolver(BaseMPSSolver):
             solve_time = time.time() - solve_start_time
 
             # For LPs, intermediate convergence data will be in the redirected log file.
+            if not is_mip and self.last_lp_log_path:
+                log_frequency = validated_params.get('log_frequency')
+                if log_frequency and log_frequency > 0:
+                    convergence_data = self._parse_cuopt_lp_log(self.last_lp_log_path, log_frequency)
+
             # For MIPs, convergence_data is populated by the callback.
 
             # Process the results
@@ -151,3 +156,45 @@ class PyCuOptMPSSolver(BaseMPSSolver):
             if isinstance(freq, (int, float)) and freq > 0:
                 validated['log_frequency'] = float(freq)
         return validated
+
+    def _parse_cuopt_lp_log(self, log_file_path: str, frequency: float) -> List[ConvergencePoint]:
+        """Parse the cuOpt LP log file for convergence data based on a time frequency."""
+        import re
+        
+        convergence_data = []
+        last_log_time = -float('inf')
+
+        try:
+            with open(log_file_path, 'r') as f:
+                log_content = f.read()
+        except FileNotFoundError:
+            logger.warning(f"cuOpt LP log file not found at {log_file_path}")
+            return []
+
+        # Regex to capture Primal Objective and Time
+        regex = r"^\s*\d+\s+([\+\-e\d\.]+)\s+[\+\-e\d\.]+\s+[\+\-e\d\.]+\s+[\+\-e\d\.]+\s+[\+\-e\d\.]+\s+([\d\.]+)s"
+        
+        matches = re.findall(regex, log_content, re.MULTILINE)
+        
+        if not matches:
+            return []
+
+        # Always add the first point
+        first_obj, first_time = matches[0]
+        convergence_data.append(ConvergencePoint(time=float(first_time), objective=float(first_obj)))
+        last_log_time = float(first_time)
+
+        # Add intermediate points based on frequency
+        for i in range(1, len(matches) - 1):
+            obj, time_str = matches[i]
+            current_time = float(time_str)
+            if (current_time - last_log_time) >= frequency:
+                convergence_data.append(ConvergencePoint(time=current_time, objective=float(obj)))
+                last_log_time = current_time
+        
+        # Always add the last point
+        if len(matches) > 1:
+            last_obj, last_time = matches[-1]
+            convergence_data.append(ConvergencePoint(time=float(last_time), objective=float(last_obj)))
+            
+        return convergence_data
