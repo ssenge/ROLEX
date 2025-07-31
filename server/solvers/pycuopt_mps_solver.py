@@ -17,7 +17,7 @@ from models import MPSOptimizationResponse, SolverDiagnostics, ConvergencePoint
 try:
     from cuopt.linear_programming import solver, solver_settings
     from cuopt.linear_programming.internals import GetSolutionCallback
-    from cuopt.linear_programming.solver.solver_parameters import CUOPT_TIME_LIMIT, CUOPT_LOG_FILE
+    from cuopt.linear_programming.solver.solver_parameters import CUOPT_TIME_LIMIT, CUOPT_LOG_FILE, CUOPT_LOG_TO_CONSOLE
     import cuopt_mps_parser
     CUOPT_AVAILABLE = True
 except ImportError:
