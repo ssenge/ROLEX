@@ -83,7 +83,8 @@ class GlopMPSSolver(BaseMPSSolver):
         solver = model_builder.ModelSolver("GLOP")
 
         if 'max_time' in validated_params and validated_params['max_time'] > 0:
-            solver.set_time_limit(validated_params['max_time'])
+            solver.set_time_limit_in_seconds(validated_params['max_time'])
+            logger.info(f"GLOP solver time limit set to {validated_params['max_time']} seconds.")
 
         solve_start_time = time.time()
         status = solver.solve(model)
