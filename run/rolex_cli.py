@@ -75,7 +75,6 @@ class RolexMPSCLI:
         self._log(f"🚀 Job {job_id} submitted to {solver.upper()} solver for file {os.path.basename(mps_file_path)}")
         
         result = self._poll_for_results(job_id)
-        self._log(f"DEBUG: Result from server: {result}")
         
         return result
 
@@ -226,7 +225,7 @@ class RolexMPSCLI:
             # Get convergence data if it exists in the result
             convergence_objectives = ""
             if opt_result and 'convergence_data' in opt_result and opt_result['convergence_data']:
-                convergence_objectives = ";".join([str(p['objective']) for p in opt_result['convergence_data']])
+                convergence_objectives = ";".join([f"{p['time']}:{p['objective']}" for p in opt_result['convergence_data']])
 
             row = {
                 'input_filename': input_filename,
@@ -344,21 +343,28 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s problem1.mps problem2.mps --output-csv results.csv
-  %(prog)s *.mps --solver cuopt --max-time 60 --output-csv results.csv
-  %(prog)s problem.mps --threads 4
-  %(prog)s problem.mps --output-csv results.csv --store-var-assignments
-  %(prog)s problem.mps --show-var-assignments
+  %(prog)s --mps problem1.mps --output-csv results.csv
+  %(prog)s --batch problems.txt --solver cuopt --max-time 60 --output-csv results.csv
+  %(prog)s --mps problem.mps --threads 4
+  %(prog)s --mps problem.mps --output-csv results.csv --store-var-assignments
+  %(prog)s --mps problem.mps --show-var-assignments
   %(prog)s --list-solvers
-  %(prog)s large_problem.mps --timeout 600
+  %(prog)s --mps large_problem.mps --timeout 600
         """
     )
 
-    parser.add_argument(
-        'mps_files',
-        nargs='*', 
-        help='One or more paths to MPS files to be processed.'
+    input_group = parser.add_mutually_exclusive_group(required=True)
+    input_group.add_argument(
+        '--mps',
+        dest='mps_file',
+        help='Path to a single MPS file to be processed.'
     )
+    input_group.add_argument(
+        '--batch',
+        dest='batch_file',
+        help='Path to a file containing one MPS file path per line.'
+    )
+
     parser.add_argument(
         '--output-csv',
         help='Path to CSV file to store results. If the file exists, results are appended.'
@@ -430,8 +436,18 @@ Examples:
         cli.print_solvers()
         return
 
-    if not args.mps_files:
-        parser.error("At least one MPS file is required, or use --list-solvers.")
+    files_to_process = []
+    if args.mps_file:
+        files_to_process.append(args.mps_file)
+    elif args.batch_file:
+        try:
+            with open(args.batch_file, 'r') as f:
+                files_to_process = [line.strip() for line in f if line.strip()]
+        except FileNotFoundError:
+            parser.error(f"Batch file not found: {args.batch_file}")
+
+    if not files_to_process:
+        parser.error("No MPS files to process. Please specify a file with --mps or a batch file with --batch.")
 
     # Build parameters
     kwargs = {}
@@ -444,8 +460,8 @@ Examples:
     if args.verbose:
         kwargs['verbose'] = True
 
-    total_files = len(args.mps_files)
-    for i, mps_file in enumerate(args.mps_files):
+    total_files = len(files_to_process)
+    for i, mps_file in enumerate(files_to_process):
         cli._log(f"Processing file {i+1}/{total_files}: {mps_file}")
         try:
             submission_timestamp = datetime.now().isoformat()

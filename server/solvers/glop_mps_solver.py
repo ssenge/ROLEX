@@ -54,10 +54,10 @@ class GlopMPSSolver(BaseMPSSolver):
                 "name": self.name,
                 "available": self.is_available(),
                 "version": self._solver_version,
-                "description": "Google's GLOP (Google Linear Optimization Package) solver for Linear Programs. Note: max_time and verbose parameters are not supported in this integration.",
+                "description": "Google's GLOP (Google Linear Optimization Package) solver for Linear Programs.",
                 "capabilities": ["LP"],
                 "parameters": {
-                    "max_time": "Not supported in this integration.",
+                    "max_time": "Supported (in seconds).",
                     "verbose": "Not supported in this integration."
                 }
             }
@@ -81,6 +81,9 @@ class GlopMPSSolver(BaseMPSSolver):
             raise RuntimeError(f"Failed to import MPS file into GLOP: {e}")
 
         solver = model_builder.ModelSolver("GLOP")
+
+        if 'max_time' in validated_params and validated_params['max_time'] > 0:
+            solver.set_time_limit(validated_params['max_time'])
 
         solve_start_time = time.time()
         status = solver.solve(model)
