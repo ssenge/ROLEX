@@ -228,7 +228,7 @@ class JobManager:
             # Update job with result
             with self.lock:
                 job.result = result
-                job.status = JobStatus.COMPLETED
+                job.status = result.status
                 job.completed_at = datetime.now().isoformat()
             
             print(f"=== DEBUG: Job {job_id} completed successfully ===")

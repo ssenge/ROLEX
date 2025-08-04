@@ -18,6 +18,7 @@ class JobStatus(str, Enum):
     RUNNING = "running" 
     COMPLETED = "completed"
     FAILED = "failed"
+    TIMELIMIT_REACHED = "timelimit_reached"
 
 
 class MPSSolverType(str, Enum):
@@ -100,14 +101,14 @@ class MPSOptimizationResponse(BaseModel):
 class JobSubmissionResponse(BaseModel):
     """Response when submitting a job"""
     job_id: str
-    status: JobStatus
+    status: str
     message: str
 
 
 class MPSJobStatusResponse(BaseModel):
     """Response when checking MPS job status"""
     job_id: str
-    status: JobStatus
+    status: str
     submitted_at: str
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
