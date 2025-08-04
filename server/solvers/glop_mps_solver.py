@@ -70,8 +70,6 @@ class GlopMPSSolver(BaseMPSSolver):
         if not self.is_available():
             raise RuntimeError("GLOP solver is not available.")
 
-        # Parameters are not directly supported by model_builder.ModelSolver for GLOP
-        # We still validate them to avoid unexpected behavior, but they won't be passed to the solver.
         validated_params = self._validate_parameters(parameters)
 
         model = model_builder.ModelBuilder()
@@ -82,9 +80,10 @@ class GlopMPSSolver(BaseMPSSolver):
 
         solver = model_builder.ModelSolver("GLOP")
 
-        if 'max_time' in validated_params and validated_params['max_time'] > 0:
-            solver.set_time_limit_in_seconds(validated_params['max_time'])
-            logger.info(f"GLOP solver time limit set to {validated_params['max_time']} seconds.")
+        time_limit = validated_params.get('max_time')
+        if time_limit and time_limit > 0:
+            solver.set_time_limit_in_seconds(time_limit)
+            logger.info(f"GLOP solver time limit set to {time_limit} seconds.")
 
         solve_start_time = time.time()
         status = solver.solve(model)
@@ -115,8 +114,13 @@ class GlopMPSSolver(BaseMPSSolver):
             solver_status = "failed"
             logger.error("GLOP: Model is invalid.")
         elif status == model_builder.SolveStatus.NOT_SOLVED:
-            solver_status = "failed"
-            logger.warning("GLOP: Problem not solved.")
+            # This status can be returned when a time limit is reached before a solution is found.
+            if time_limit and solve_time >= time_limit * 0.99:
+                solver_status = "timelimit_reached"
+                logger.warning("GLOP: Time limit reached, no solution found.")
+            else:
+                solver_status = "failed"
+                logger.warning("GLOP: Problem not solved.")
         elif status == model_builder.SolveStatus.ABNORMAL:
             solver_status = "failed"
             logger.error("GLOP: Abnormal termination.")
@@ -126,6 +130,11 @@ class GlopMPSSolver(BaseMPSSolver):
         else:
             solver_status = "failed"
             logger.error(f"GLOP: Unexpected solve status: {status}")
+
+        # Check if time limit was reached even if a feasible/optimal solution was found
+        if time_limit and solve_time >= time_limit * 0.99 and solver_status in ['optimal', 'feasible']:
+            solver_status = "timelimit_reached"
+            logger.warning(f"GLOP: Time limit reached, returning best found solution with status '{solver_status}'.")
 
         return MPSOptimizationResponse(
             status=solver_status,
