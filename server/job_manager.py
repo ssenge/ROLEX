@@ -52,7 +52,7 @@ class MPSJob:
             "submitted_at": self.submitted_at,
             "started_at": self.started_at,
             "completed_at": self.completed_at,
-            "result": self.result.dict() if self.result else None,
+            "result": self.result.model_dump() if self.result else None,
             "error": self.error
         }
 

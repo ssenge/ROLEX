@@ -34,7 +34,8 @@ class PyomoMPSSolver(BaseMPSSolver):
     solver_name = None  # To be overridden in subclasses
     
     def __init__(self):
-        self.name = f"Pyomo-{self.solver_name.upper()}"
+        name = f"Pyomo-{self.solver_name.upper()}"
+        super().__init__(name)
         self._available = None
         self._solver_version = "unknown"
         self._solver_factory = None

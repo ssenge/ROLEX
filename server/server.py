@@ -113,6 +113,8 @@ async def submit_mps_job(request: Request):
         solver = query_params.get("solver")
         filename = query_params.get("filename")
         parameters = query_params.get("parameters", "{}")
+        optimality_tolerance_str = query_params.get("optimality_tolerance")
+        optimality_tolerance = float(optimality_tolerance_str) if optimality_tolerance_str else None
 
         if not solver or not filename:
             raise HTTPException(status_code=400, detail="'solver' and 'filename' are required query parameters.")
@@ -221,7 +223,8 @@ async def submit_mps_job(request: Request):
         # Create request object
         request = MPSOptimizationRequest(
             solver=solver_type,
-            parameters=params
+            parameters=params,
+            optimality_tolerance=optimality_tolerance
         )
         
         # Submit job
@@ -275,7 +278,7 @@ async def get_mps_job_status(job_id: str):
     
     try:
         job_status = await solver_manager.get_mps_job_status(job_id)
-        logger.debug(f"Returning job status for {job_id}: {job_status.dict()}")
+        logger.debug(f"Returning job status for {job_id}: {job_status.model_dump()}")
         return job_status
     except KeyError:
         raise HTTPException(status_code=404, detail="Job not found")
