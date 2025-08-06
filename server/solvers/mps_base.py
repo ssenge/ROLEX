@@ -2,11 +2,11 @@
 ROLEX Server - Base MPS Solver Interface
 """
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import time
 import os
 import tempfile
-from models import MPSOptimizationResponse, SolverDiagnostics
+from models import MPSOptimizationResponse, SolverDiagnostics, SolverCapability
 
 
 class BaseMPSSolver(ABC):
@@ -28,13 +28,19 @@ class BaseMPSSolver(ABC):
         pass
     
     @abstractmethod
-    def solve_mps(self, mps_file_path: str, parameters: Dict[str, Any]) -> MPSOptimizationResponse:
+    def get_capabilities(self) -> List[SolverCapability]:
+        """Get list of solver capabilities"""
+        pass
+    
+    @abstractmethod
+    def solve_mps(self, mps_file_path: str, parameters: Dict[str, Any], optimality_tolerance: Optional[float] = None) -> MPSOptimizationResponse:
         """
         Solve MPS optimization problem
         
         Args:
             mps_file_path: Path to the MPS file
             parameters: Solver-specific parameters
+            optimality_tolerance: Optional optimality tolerance/gap (solver-specific)
             
         Returns:
             MPSOptimizationResponse with solution details
@@ -44,7 +50,7 @@ class BaseMPSSolver(ABC):
         """
         pass
     
-    def solve_with_timing(self, mps_file_path: str, parameters: Dict[str, Any]) -> MPSOptimizationResponse:
+    def solve_with_timing(self, mps_file_path: str, parameters: Dict[str, Any], optimality_tolerance: Optional[float] = None) -> MPSOptimizationResponse:
         """
         Wrapper that provides consistent response format and error handling
         
@@ -74,7 +80,7 @@ class BaseMPSSolver(ABC):
                 raise RuntimeError(f"MPS file not found: {mps_file_path}")
             
             # Call solver-specific implementation
-            result = self.solve_mps(mps_file_path, parameters)
+            result = self.solve_mps(mps_file_path, parameters, optimality_tolerance)
             
             # Calculate total time
             total_time = time.time() - overall_start_time
