@@ -47,7 +47,7 @@ class MPSOptimizationRequest(BaseModel):
     optimality_tolerance: Optional[float] = None
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "solver": "gurobi",
                 "parameters": {
@@ -90,7 +90,7 @@ class MPSOptimizationResponse(BaseModel):
     convergence_data: Optional[List[ConvergencePoint]] = None
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "status": "optimal",
                 "objective_value": 42.0,
