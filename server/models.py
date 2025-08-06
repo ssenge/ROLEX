@@ -30,6 +30,7 @@ class MPSSolverType(str, Enum):
     ORTOOLS_CBC = "ortools-cbc"
     ORTOOLS_CLP = "ortools-clp"
     ORTOOLS_SCIP = "ortools-scip"
+    ORTOOLS_PDLP = "ortools-pdlp"
     SCIPY_LP = "scipy-lp"
     PYOMO_CPLEX = "pyomo-cplex"
     PYOMO_GUROBI = "pyomo-gurobi"

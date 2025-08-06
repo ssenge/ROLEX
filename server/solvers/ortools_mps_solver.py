@@ -285,4 +285,29 @@ class ORToolsSCIPSolver(ORToolsMPSSolver):
         else:
             info["version"] = None
             
+        return info
+
+
+class ORToolsPDLPSolver(ORToolsMPSSolver):
+    """OR-Tools PDLP (Primal-Dual Linear Programming) solver"""
+    engine_name = "PDLP"
+    
+    def get_capabilities(self) -> List[SolverCapability]:
+        """PDLP can solve LP problems"""
+        return [SolverCapability.LP]
+    
+    def get_solver_info(self) -> Dict[str, Any]:
+        """Get PDLP solver information"""
+        info = {
+            "name": "OR-Tools PDLP",
+            "available": self.is_available(),
+            "capabilities": [cap.value for cap in self.get_capabilities()]
+        }
+        
+        # Add OR-Tools version if available
+        if self.is_available():
+            info["version"] = self._solver_version
+        else:
+            info["version"] = None
+            
         return info 

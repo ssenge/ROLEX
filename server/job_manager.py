@@ -16,7 +16,7 @@ from models import JobStatus, MPSSolverType, MPSOptimizationResponse, MPSJobStat
 from solvers.gurobi_mps_solver import GurobiMPSSolver
 from solvers.cuopt_mps_solver import CuOptMPSSolver
 from solvers.pycuopt_mps_solver import PyCuOptMPSSolver
-from solvers.ortools_mps_solver import ORToolsGLOPSolver, ORToolsCBCSolver, ORToolsCLPSolver, ORToolsSCIPSolver
+from solvers.ortools_mps_solver import ORToolsGLOPSolver, ORToolsCBCSolver, ORToolsCLPSolver, ORToolsSCIPSolver, ORToolsPDLPSolver
 from solvers.scipy_mps_solver import SciPyMPSSolver
 from solvers.pyomo_mps_solver import (
     PyomoCPLEXSolver, PyomoGurobiSolver, PyomoGLPKSolver,
@@ -125,6 +125,13 @@ class JobManager:
             logger.info("OR-Tools SCIP solver initialized")
         except Exception as e:
             logger.error(f"Failed to initialize OR-Tools SCIP solver: {e}")
+
+        # OR-Tools PDLP solver
+        try:
+            self.mps_solvers[MPSSolverType.ORTOOLS_PDLP] = ORToolsPDLPSolver()
+            logger.info("OR-Tools PDLP solver initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize OR-Tools PDLP solver: {e}")
 
         # SciPy LP solver
         try:

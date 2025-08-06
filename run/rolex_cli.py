@@ -424,7 +424,7 @@ Examples:
     )
     parser.add_argument(
         '--solver',
-        choices=['gurobi', 'cuopt', 'pycuopt', 'ortools-glop', 'ortools-cbc', 'ortools-clp', 'ortools-scip', 'scipy-lp', 'pyomo-cplex', 'pyomo-gurobi', 'pyomo-glpk', 'pyomo-cbc', 'pyomo-ipopt', 'pyomo-scip', 'pyomo-highs'],
+        choices=['gurobi', 'cuopt', 'pycuopt', 'ortools-glop', 'ortools-cbc', 'ortools-clp', 'ortools-scip', 'ortools-pdlp', 'scipy-lp', 'pyomo-cplex', 'pyomo-gurobi', 'pyomo-glpk', 'pyomo-cbc', 'pyomo-ipopt', 'pyomo-scip', 'pyomo-highs'],
         default='gurobi',
         help='Solver to use (default: gurobi)'
     )
