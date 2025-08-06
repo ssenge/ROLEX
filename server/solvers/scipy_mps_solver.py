@@ -6,8 +6,8 @@ import time
 from typing import Dict, Any, List, Optional
 import numpy as np
 
-from .mps_base import BaseMPSSolver, SolverCapability, SolverDiagnostics
-from models import MPSOptimizationResponse
+from .mps_base import BaseMPSSolver
+from models import MPSOptimizationResponse, SolverDiagnostics, SolverCapability
 
 logger = logging.getLogger(__name__)
 
