@@ -298,6 +298,13 @@ class JobManager:
             
             # Execute optimization
             print(f"=== DEBUG: Calling solve_with_timing ===")
+            print(f"=== DEBUG: Solver type: {type(solver)} ===")
+            print(f"=== DEBUG: Solver MRO: {type(solver).__mro__} ===")
+            print(f"=== DEBUG: solve_with_timing method: {solver.solve_with_timing} ===")
+            
+            import inspect
+            print(f"=== DEBUG: solve_with_timing signature: {inspect.signature(solver.solve_with_timing)} ===")
+            
             result = solver.solve_with_timing(job.mps_file_path, job.parameters, job.optimality_tolerance)
             print(f"=== DEBUG: solve_with_timing completed with status: {result.status} ===")
             logger.debug(f"Job {job_id} convergence_data: {result.convergence_data}")
