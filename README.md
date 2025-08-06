@@ -1,6 +1,6 @@
 # ROLEX - Remote Optimization Library EXecution
 
-A FastAPI-based optimization server that accepts OMMX format problems and solves them using various solvers (Gurobi, cuOpt, SciPy).
+A FastAPI-based optimization server that accepts MPS format problems and solves them using various solvers (Gurobi, cuOpt, SciPy).
 
 ## 🚀 Quick Start
 

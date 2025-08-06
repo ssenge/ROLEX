@@ -15,8 +15,13 @@ import logging
 from models import JobStatus, MPSSolverType, MPSOptimizationResponse, MPSJobStatusResponse, MPSOptimizationRequest
 from solvers.gurobi_mps_solver import GurobiMPSSolver
 from solvers.cuopt_mps_solver import CuOptMPSSolver
-from solvers.glop_mps_solver import GlopMPSSolver
 from solvers.pycuopt_mps_solver import PyCuOptMPSSolver
+from solvers.ortools_mps_solver import ORToolsGLOPSolver, ORToolsCBCSolver, ORToolsCLPSolver, ORToolsSCIPSolver
+from solvers.scipy_mps_solver import SciPyMPSSolver
+from solvers.pyomo_mps_solver import (
+    PyomoCPLEXSolver, PyomoGurobiSolver, PyomoGLPKSolver,
+    PyomoCBCSolver, PyomoIPOPTSolver, PyomoSCIPSolver, PyomoHiGHSSolver
+)
 
 
 logger = logging.getLogger(__name__)
@@ -25,11 +30,12 @@ logger = logging.getLogger(__name__)
 class MPSJob:
     """Represents an MPS optimization job"""
     
-    def __init__(self, job_id: str, solver_type: MPSSolverType, mps_file_path: str, parameters: Dict[str, Any]):
+    def __init__(self, job_id: str, solver_type: MPSSolverType, mps_file_path: str, parameters: Dict[str, Any], optimality_tolerance: Optional[float] = None):
         self.job_id = job_id
         self.solver_type = solver_type
         self.mps_file_path = mps_file_path
         self.parameters = parameters
+        self.optimality_tolerance = optimality_tolerance
         self.status = JobStatus.QUEUED
         self.submitted_at = datetime.now().isoformat()
         self.started_at: Optional[str] = None
@@ -85,19 +91,90 @@ class JobManager:
         except Exception as e:
             logger.error(f"Failed to initialize cuOpt MPS solver: {e}")
 
-        # GLOP MPS solver
-        try:
-            self.mps_solvers[MPSSolverType.GLOP] = GlopMPSSolver()
-            logger.info("GLOP MPS solver initialized")
-        except Exception as e:
-            logger.error(f"Failed to initialize GLOP MPS solver: {e}")
-
         # pyCuOpt MPS solver
         try:
             self.mps_solvers[MPSSolverType.PYCUOPT] = PyCuOptMPSSolver()
             logger.info("pyCuOpt MPS solver initialized")
         except Exception as e:
             logger.error(f"Failed to initialize pyCuOpt MPS solver: {e}")
+
+        # OR-Tools GLOP solver
+        try:
+            self.mps_solvers[MPSSolverType.ORTOOLS_GLOP] = ORToolsGLOPSolver()
+            logger.info("OR-Tools GLOP solver initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize OR-Tools GLOP solver: {e}")
+
+        # OR-Tools CBC solver
+        try:
+            self.mps_solvers[MPSSolverType.ORTOOLS_CBC] = ORToolsCBCSolver()
+            logger.info("OR-Tools CBC solver initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize OR-Tools CBC solver: {e}")
+
+        # OR-Tools CLP solver
+        try:
+            self.mps_solvers[MPSSolverType.ORTOOLS_CLP] = ORToolsCLPSolver()
+            logger.info("OR-Tools CLP solver initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize OR-Tools CLP solver: {e}")
+
+        # OR-Tools SCIP solver
+        try:
+            self.mps_solvers[MPSSolverType.ORTOOLS_SCIP] = ORToolsSCIPSolver()
+            logger.info("OR-Tools SCIP solver initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize OR-Tools SCIP solver: {e}")
+
+        # SciPy LP solver
+        try:
+            self.mps_solvers[MPSSolverType.SCIPY_LP] = SciPyMPSSolver()
+            logger.info("SciPy LP solver initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize SciPy LP solver: {e}")
+        
+        # Initialize Pyomo solvers
+        try:
+            self.mps_solvers[MPSSolverType.PYOMO_CPLEX] = PyomoCPLEXSolver()
+            logger.info("Pyomo CPLEX solver initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize Pyomo CPLEX solver: {e}")
+            
+        try:
+            self.mps_solvers[MPSSolverType.PYOMO_GUROBI] = PyomoGurobiSolver()
+            logger.info("Pyomo Gurobi solver initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize Pyomo Gurobi solver: {e}")
+            
+        try:
+            self.mps_solvers[MPSSolverType.PYOMO_GLPK] = PyomoGLPKSolver()
+            logger.info("Pyomo GLPK solver initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize Pyomo GLPK solver: {e}")
+            
+        try:
+            self.mps_solvers[MPSSolverType.PYOMO_CBC] = PyomoCBCSolver()
+            logger.info("Pyomo CBC solver initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize Pyomo CBC solver: {e}")
+            
+        try:
+            self.mps_solvers[MPSSolverType.PYOMO_IPOPT] = PyomoIPOPTSolver()
+            logger.info("Pyomo IPOPT solver initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize Pyomo IPOPT solver: {e}")
+            
+        try:
+            self.mps_solvers[MPSSolverType.PYOMO_SCIP] = PyomoSCIPSolver()
+            logger.info("Pyomo SCIP solver initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize Pyomo SCIP solver: {e}")
+            
+        try:
+            self.mps_solvers[MPSSolverType.PYOMO_HIGHS] = PyomoHiGHSSolver()
+            logger.info("Pyomo HiGHS solver initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize Pyomo HiGHS solver: {e}")
     
     def _log_solver_status(self):
         """Log the availability of all solvers"""
@@ -136,7 +213,8 @@ class JobManager:
             job_id=job_id,
             solver_type=request.solver,
             mps_file_path=mps_file_path,
-            parameters=request.parameters
+            parameters=request.parameters,
+            optimality_tolerance=request.optimality_tolerance
         )
         print(f"=== DEBUG: Created job object ===")
         
@@ -220,7 +298,7 @@ class JobManager:
             
             # Execute optimization
             print(f"=== DEBUG: Calling solve_with_timing ===")
-            result = solver.solve_with_timing(job.mps_file_path, job.parameters)
+            result = solver.solve_with_timing(job.mps_file_path, job.parameters, job.optimality_tolerance)
             print(f"=== DEBUG: solve_with_timing completed with status: {result.status} ===")
             logger.debug(f"Job {job_id} convergence_data: {result.convergence_data}")
             logger.debug(f"Job {job_id} parameters_used: {result.parameters_used}")

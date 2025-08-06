@@ -4,7 +4,7 @@ Clean request/response models for MPS optimization jobs
 """
 from typing import Dict, Any, Optional, List
 from pydantic import BaseModel
-from enum import Enum
+from enum import Enum, StrEnum
 
 # Version configuration
 SERVER_NAME = "ROLEX"
@@ -25,14 +25,26 @@ class MPSSolverType(str, Enum):
     """Available MPS solver types"""
     GUROBI = "gurobi"
     CUOPT = "cuopt"
-    GLOP = "glop"
     PYCUOPT = "pycuopt"
+    ORTOOLS_GLOP = "ortools-glop"
+    ORTOOLS_CBC = "ortools-cbc"
+    ORTOOLS_CLP = "ortools-clp"
+    ORTOOLS_SCIP = "ortools-scip"
+    SCIPY_LP = "scipy-lp"
+    PYOMO_CPLEX = "pyomo-cplex"
+    PYOMO_GUROBI = "pyomo-gurobi"
+    PYOMO_GLPK = "pyomo-glpk"
+    PYOMO_CBC = "pyomo-cbc"
+    PYOMO_IPOPT = "pyomo-ipopt"
+    PYOMO_SCIP = "pyomo-scip"
+    PYOMO_HIGHS = "pyomo-highs"
 
 
 class MPSOptimizationRequest(BaseModel):
     """Request to solve an MPS optimization problem"""
     solver: MPSSolverType
     parameters: Optional[Dict[str, Any]] = {}
+    optimality_tolerance: Optional[float] = None
     
     class Config:
         schema_extra = {
@@ -133,3 +145,9 @@ class ServerInfo(BaseModel):
     available_solvers: Dict[str, SolverInfo]
     active_jobs: int
     total_jobs: int 
+
+
+class SolverCapability(StrEnum):
+    """Solver capabilities for optimization problem types"""
+    LP = "lp"     # Can solve LP problems
+    MIP = "mip"   # Can solve MIP problems 
