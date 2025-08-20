@@ -22,6 +22,10 @@ from solvers.pyomo_mps_solver import (
     PyomoCPLEXSolver, PyomoGurobiSolver, PyomoGLPKSolver,
     PyomoCBCSolver, PyomoIPOPTSolver, PyomoSCIPSolver, PyomoHiGHSSolver
 )
+from solvers.cvxpy_mps_solver import (
+    CVXPYCLARABELSolver, CVXPYOSQPSolver, CVXPYCVXOPTSolver,
+    CVXPYSCSSolver, CVXPYPROXQPSolver, CVXPYECOSSolver, CVXPYMOSEK
+)
 
 
 logger = logging.getLogger(__name__)
@@ -86,17 +90,31 @@ class JobManager:
         
         # cuOpt MPS solver
         try:
-            self.mps_solvers[MPSSolverType.CUOPT] = CuOptMPSSolver()
+            logger.info("Attempting to initialize cuOpt MPS solver...")
+            cuopt_solver = CuOptMPSSolver()
+            logger.info(f"cuOpt solver created successfully: {cuopt_solver}")
+            logger.info(f"cuOpt solver has get_capabilities: {hasattr(cuopt_solver, 'get_capabilities')}")
+            logger.info(f"cuOpt solver capabilities: {cuopt_solver.get_capabilities()}")
+            self.mps_solvers[MPSSolverType.CUOPT] = cuopt_solver
             logger.info("cuOpt MPS solver initialized")
         except Exception as e:
+            import traceback
             logger.error(f"Failed to initialize cuOpt MPS solver: {e}")
+            logger.error(f"Full traceback: {traceback.format_exc()}")
 
         # pyCuOpt MPS solver
         try:
-            self.mps_solvers[MPSSolverType.PYCUOPT] = PyCuOptMPSSolver()
+            logger.info("Attempting to initialize pyCuOpt MPS solver...")
+            pycuopt_solver = PyCuOptMPSSolver()
+            logger.info(f"pyCuOpt solver created successfully: {pycuopt_solver}")
+            logger.info(f"pyCuOpt solver has get_capabilities: {hasattr(pycuopt_solver, 'get_capabilities')}")
+            logger.info(f"pyCuOpt solver capabilities: {pycuopt_solver.get_capabilities()}")
+            self.mps_solvers[MPSSolverType.PYCUOPT] = pycuopt_solver
             logger.info("pyCuOpt MPS solver initialized")
         except Exception as e:
+            import traceback
             logger.error(f"Failed to initialize pyCuOpt MPS solver: {e}")
+            logger.error(f"Full traceback: {traceback.format_exc()}")
 
         # OR-Tools GLOP solver
         try:
@@ -182,6 +200,49 @@ class JobManager:
             logger.info("Pyomo HiGHS solver initialized")
         except Exception as e:
             logger.error(f"Failed to initialize Pyomo HiGHS solver: {e}")
+        
+        # CVXPY solvers
+        try:
+            self.mps_solvers[MPSSolverType.CVXPY_CLARABEL] = CVXPYCLARABELSolver()
+            logger.info("CVXPY CLARABEL solver initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize CVXPY CLARABEL solver: {e}")
+            
+        try:
+            self.mps_solvers[MPSSolverType.CVXPY_OSQP] = CVXPYOSQPSolver()
+            logger.info("CVXPY OSQP solver initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize CVXPY OSQP solver: {e}")
+            
+        try:
+            self.mps_solvers[MPSSolverType.CVXPY_CVXOPT] = CVXPYCVXOPTSolver()
+            logger.info("CVXPY CVXOPT solver initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize CVXPY CVXOPT solver: {e}")
+            
+        try:
+            self.mps_solvers[MPSSolverType.CVXPY_SCS] = CVXPYSCSSolver()
+            logger.info("CVXPY SCS solver initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize CVXPY SCS solver: {e}")
+            
+        try:
+            self.mps_solvers[MPSSolverType.CVXPY_PROXQP] = CVXPYPROXQPSolver()
+            logger.info("CVXPY PROXQP solver initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize CVXPY PROXQP solver: {e}")
+            
+        try:
+            self.mps_solvers[MPSSolverType.CVXPY_ECOS] = CVXPYECOSSolver()
+            logger.info("CVXPY ECOS solver initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize CVXPY ECOS solver: {e}")
+            
+        try:
+            self.mps_solvers[MPSSolverType.CVXPY_MOSEK] = CVXPYMOSEK()
+            logger.info("CVXPY MOSEK solver initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize CVXPY MOSEK solver: {e}")
     
     def _log_solver_status(self):
         """Log the availability of all solvers"""
