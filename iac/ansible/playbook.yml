@@ -1,0 +1,311 @@
+---
+- name: Deploy ROLEX MPS Server on GPU Instance
+  hosts: rolex_servers
+  become: yes
+  vars:
+    conda_env_name: rolex-server
+    rolex_user: ubuntu
+    rolex_home: /home/ubuntu
+    rolex_dir: "{{ rolex_home }}/rolex"
+    conda_path: "/opt/miniforge"
+    
+  tasks:
+    - name: Ensure only essential system packages are installed
+      package:
+        name:
+          - git
+          - curl
+          - iptables-persistent
+        state: present
+        
+    # Port forwarding commented out - direct access via 8080
+    # - name: Add iptables port forwarding 80 to 8080
+    #   iptables:
+    #     table: nat
+    #     chain: PREROUTING
+    #     protocol: tcp
+    #     destination_port: 80
+    #     jump: REDIRECT
+    #     to_ports: 8080
+    #     comment: "Forward external port 80 to internal ROLEX server port 8080"
+    #   
+    # - name: Save iptables rules
+    #   shell: iptables-save > /etc/iptables/rules.v4
+        
+    - name: Clone ROLEX repository
+      git:
+        repo: "{{ rolex_repo_url }}"
+        dest: "{{ rolex_dir }}"
+        force: yes
+      become_user: "{{ rolex_user }}"
+      
+    - name: Initialize conda for user
+      shell: |
+        {{ conda_path }}/condabin/conda init bash
+        {{ conda_path }}/condabin/conda init zsh || true
+      become_user: "{{ rolex_user }}"
+      
+    - name: Configure conda channels
+      shell: |
+        {{ conda_path }}/condabin/conda config --add channels rapidsai
+        {{ conda_path }}/condabin/conda config --add channels conda-forge
+        {{ conda_path }}/condabin/conda config --add channels nvidia
+        {{ conda_path }}/condabin/conda config --add channels gurobi
+        {{ conda_path }}/condabin/conda config --set channel_priority strict
+      become_user: "{{ rolex_user }}"
+      
+    - name: Create rolex-server conda environment
+      shell: |
+        eval "$({{ conda_path }}/condabin/conda shell.bash hook)"
+        conda create -n {{ conda_env_name }} python=3.12 -y || \
+        conda env update -n {{ conda_env_name }} python=3.12 -y
+      become_user: "{{ rolex_user }}"
+      args:
+        executable: /bin/bash
+      environment:
+        PATH: "{{ conda_path }}/condabin:{{ ansible_env.PATH }}"
+      
+    - name: Install cuOpt package
+      shell: |
+        eval "$({{ conda_path }}/condabin/conda shell.bash hook)"
+        conda activate {{ conda_env_name }}
+        conda install -c rapidsai -c conda-forge -c nvidia libcuopt=25.5.* python=3.12 cuda-version=12.8 -y
+      become_user: "{{ rolex_user }}"
+      args:
+        executable: /bin/bash
+      environment:
+        PATH: "{{ conda_path }}/condabin:{{ ansible_env.PATH }}"
+      
+    - name: Install cuOpt Python package
+      shell: |
+        eval "$({{ conda_path }}/condabin/conda shell.bash hook)"
+        conda activate {{ conda_env_name }}
+        conda install -c rapidsai -c conda-forge -c nvidia cuopt=25.5.* python=3.12 cuda-version=12.8 -y
+      become_user: "{{ rolex_user }}"
+      args:
+        executable: /bin/bash
+      environment:
+        PATH: "{{ conda_path }}/condabin:{{ ansible_env.PATH }}"
+      
+    - name: Install CUDA
+      shell: |
+        eval "$({{ conda_path }}/condabin/conda shell.bash hook)"
+        conda activate {{ conda_env_name }}
+        conda install cuda -c nvidia -y
+      become_user: "{{ rolex_user }}"
+      args:
+        executable: /bin/bash
+      environment:
+        PATH: "{{ conda_path }}/condabin:{{ ansible_env.PATH }}"
+      
+    - name: Install core Python packages
+      shell: |
+        eval "$({{ conda_path }}/condabin/conda shell.bash hook)"
+        conda activate {{ conda_env_name }}
+        conda install fastapi uvicorn pydantic requests tqdm scipy -y 
+      become_user: "{{ rolex_user }}"
+      args:
+        executable: /bin/bash
+      environment:
+        PATH: "{{ conda_path }}/condabin:{{ ansible_env.PATH }}"
+
+    - name: Install OR-Tools (for GLOP solver)
+      shell: |
+        eval "$({{ conda_path }}/condabin/conda shell.bash hook)"
+        conda activate {{ conda_env_name }}
+        pip install ortools
+      become_user: "{{ rolex_user }}"
+      args:
+        executable: /bin/bash
+      environment:
+        PATH: "{{ conda_path }}/condabin:{{ ansible_env.PATH }}"
+      
+    - name: Install Gurobi 
+      shell: |
+        eval "$({{ conda_path }}/condabin/conda shell.bash hook)"
+        conda activate {{ conda_env_name }}
+        conda install gurobi -c gurobi -y
+      become_user: "{{ rolex_user }}"
+      args:
+        executable: /bin/bash
+      environment:
+        PATH: "{{ conda_path }}/condabin:{{ ansible_env.PATH }}"
+      ignore_errors: yes  # Gurobi might need license configuration
+
+    - name: Copy Gurobi license file
+      copy:
+        src: "~/Downloads/gurobi.lic"
+        dest: "{{ rolex_home }}/gurobi.lic"
+        owner: "{{ rolex_user }}"
+        mode: '0644'
+      become_user: "{{ rolex_user }}"
+      ignore_errors: yes  # License file might not exist
+      
+    - name: Install Pyomo
+      shell: |
+        eval "$({{ conda_path }}/condabin/conda shell.bash hook)"
+        conda activate {{ conda_env_name }}
+        pip install pyomo
+      become_user: "{{ rolex_user }}"
+      args:
+        executable: /bin/bash
+      environment:
+        PATH: "{{ conda_path }}/condabin:{{ ansible_env.PATH }}"
+      
+    # Standalone solvers for Pyomo
+    - name: Install GLPK (GNU Linear Programming Kit)
+      shell: |
+        eval "$({{ conda_path }}/condabin/conda shell.bash hook)"
+        conda activate {{ conda_env_name }}
+        conda install glpk -c conda-forge -y
+      become_user: "{{ rolex_user }}"
+      args:
+        executable: /bin/bash
+      environment:
+        PATH: "{{ conda_path }}/condabin:{{ ansible_env.PATH }}"
+      
+    - name: Install CBC (Coin-or Branch and Cut)
+      shell: |
+        eval "$({{ conda_path }}/condabin/conda shell.bash hook)"
+        conda activate {{ conda_env_name }}
+        conda install coincbc -c conda-forge -y
+      become_user: "{{ rolex_user }}"
+      args:
+        executable: /bin/bash
+      environment:
+        PATH: "{{ conda_path }}/condabin:{{ ansible_env.PATH }}"
+        
+    - name: Install SCIP Optimization Suite
+      shell: |
+        eval "$({{ conda_path }}/condabin/conda shell.bash hook)"
+        conda activate {{ conda_env_name }}
+        conda install scip -c conda-forge -y
+      become_user: "{{ rolex_user }}"
+      args:
+        executable: /bin/bash
+      environment:
+        PATH: "{{ conda_path }}/condabin:{{ ansible_env.PATH }}"
+      ignore_errors: yes  # SCIP might need specific setup
+        
+    - name: Install IPOPT (Interior Point Optimizer)
+      shell: |
+        eval "$({{ conda_path }}/condabin/conda shell.bash hook)"
+        conda activate {{ conda_env_name }}
+        conda install ipopt -c conda-forge -y
+      become_user: "{{ rolex_user }}"
+      args:
+        executable: /bin/bash
+      environment:
+        PATH: "{{ conda_path }}/condabin:{{ ansible_env.PATH }}"
+        
+    - name: Install HiGHS (High performance linear programming solver)
+      shell: |
+        eval "$({{ conda_path }}/condabin/conda shell.bash hook)"
+        conda activate {{ conda_env_name }}
+        pip install highspy
+      become_user: "{{ rolex_user }}"
+      args:
+        executable: /bin/bash
+      environment:
+        PATH: "{{ conda_path }}/condabin:{{ ansible_env.PATH }}"
+      
+    - name: Test Pyomo solver availability
+      shell: |
+        eval "$({{ conda_path }}/condabin/conda shell.bash hook)"
+        conda activate {{ conda_env_name }}
+        python -c "
+        from pyomo.opt import SolverFactory
+        solvers = ['glpk', 'cbc', 'scip', 'ipopt', 'highs']
+        print('Pyomo Solver Availability:')
+        for solver in solvers:
+            try:
+                s = SolverFactory(solver)
+                available = s.available()
+                print(f'  {solver}: {\"✅\" if available else \"❌\"} {\"Available\" if available else \"Not Available\"}')
+            except Exception as e:
+                print(f'  {solver}: ❌ Error: {e}')
+        "
+      become_user: "{{ rolex_user }}"
+      register: pyomo_solver_test
+      args:
+        executable: /bin/bash
+      environment:
+        PATH: "{{ conda_path }}/condabin:{{ ansible_env.PATH }}"
+        
+    - name: Display Pyomo solver test results
+      debug:
+        msg: "{{ pyomo_solver_test.stdout }}"
+      
+    - name: Test cuOpt CLI availability
+      shell: |
+        eval "$({{ conda_path }}/condabin/conda shell.bash hook)"
+        conda activate {{ conda_env_name }}
+        which cuopt_cli
+        cuopt_cli --version
+      become_user: "{{ rolex_user }}"
+      register: cuopt_cli_test
+      args:
+        executable: /bin/bash
+      environment:
+        PATH: "{{ conda_path }}/condabin:{{ ansible_env.PATH }}"
+      
+    - name: Display cuOpt CLI test results
+      debug:
+        msg: "{{ cuopt_cli_test.stdout }}"
+      
+    - name: Start ROLEX server
+      shell: |
+        eval "$({{ conda_path }}/condabin/conda shell.bash hook)"
+        conda activate {{ conda_env_name }}
+        cd {{ rolex_dir }}
+        ./run/rolex_server.sh start
+      become_user: "{{ rolex_user }}"
+      register: server_start
+      args:
+        executable: /bin/bash
+      environment:
+        PATH: "{{ conda_path }}/condabin:{{ ansible_env.PATH }}"
+      
+    - name: Display server start results
+      debug:
+        msg: "{{ server_start.stdout }}"
+      
+    - name: Wait for server to start
+      wait_for:
+        port: 8080
+        host: "{{ ansible_default_ipv4.address }}"
+        timeout: 30
+      
+    - name: Test server health
+      uri:
+        url: "http://{{ ansible_default_ipv4.address }}:8080/health"
+        method: GET
+      register: health_check
+      
+    - name: Display health check results
+      debug:
+        msg: "{{ health_check.json }}"
+      
+    - name: Display final deployment status
+      debug:
+        msg: |
+          🎉 ROLEX MPS Server deployment completed!
+          
+          Server: http://{{ ansible_default_ipv4.address }}:8080
+          SSH: ssh -p 443 ubuntu@{{ ansible_default_ipv4.address }}
+          Health: {{ health_check.json.status }}
+          
+          Available endpoints:
+          - GET /health
+          - GET /solvers/mps  
+          - POST /jobs/submit-mps
+          - GET /jobs/{job_id}/mps
+          
+          Installed solvers:
+          - Direct: gurobi, cuopt, pycuopt, scipy-lp
+          - OR-Tools: ortools-glop, ortools-cbc, ortools-clp, ortools-scip
+          - Pyomo: pyomo-gurobi, pyomo-glpk, pyomo-cbc, pyomo-scip, pyomo-ipopt, pyomo-highs
+          
+          CLI Usage:
+          python {{ rolex_dir }}/run/rolex_cli.py --server http://{{ ansible_default_ipv4.address }}:8080 --solver pyomo-glpk example.mps
+          python {{ rolex_dir }}/run/rolex_cli.py --server http://{{ ansible_default_ipv4.address }}:8080 --list-solvers 

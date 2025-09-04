@@ -319,7 +319,7 @@ async def global_exception_handler(request, exc):
 
 
 # Server startup function
-def run_server(host: str = "0.0.0.0", port: int = 8000, workers: int = 1):
+def run_server(host: str = "0.0.0.0", port: int = 8080, workers: int = 1):
     """Run the ROLEX server."""
     # Store configuration in app state
     app.state.max_workers = workers
@@ -342,7 +342,7 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description="ROLEX Optimization Server")
     parser.add_argument("--host", default="0.0.0.0", help="Host to bind to")
-    parser.add_argument("--port", type=int, default=8000, help="Port to bind to")
+    parser.add_argument("--port", type=int, default=8080, help="Port to bind to")
     parser.add_argument("--workers", type=int, default=1, help="Number of worker processes")
     
     args = parser.parse_args()
