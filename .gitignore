@@ -51,4 +51,9 @@ server.log
 # === Temporary files ===
 *.tmp
 *.temp
-.cache/ 
+.cache/ __pycache__/
+*.pyc
+*.pyo
+*.log
+server/__pycache__/
+server/solvers/__pycache__/
