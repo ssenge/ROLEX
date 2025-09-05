@@ -10,7 +10,7 @@ SERVER_DIR="$PROJECT_ROOT/server"
 PID_FILE="$PROJECT_ROOT/run/rolex_server.pid"
 
 # Default settings
-DEFAULT_PORT=8000
+DEFAULT_PORT=8080
 DEFAULT_LOG_DIR="."
 LOG_DIR="$DEFAULT_LOG_DIR"
 CONDA_ENV_NAME="rolex-server"
