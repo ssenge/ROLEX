@@ -8,10 +8,10 @@ import subprocess
 import os
 import tempfile
 import uuid
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 from .mps_base import BaseMPSSolver
-from models import MPSOptimizationResponse, SolverDiagnostics
+from models import MPSOptimizationResponse, SolverDiagnostics, SolverCapability
 from .mps_parser_utils import get_mps_dimensions
 
 logger = logging.getLogger(__name__)
@@ -53,33 +53,19 @@ class CuOptMPSSolver(BaseMPSSolver):
             logger.error(f"cuOpt CLI check failed: {str(e)}")
             return False
     
+    def get_capabilities(self) -> List[SolverCapability]:
+        """cuOpt can solve LP and MIP problems"""
+        return [SolverCapability.LP, SolverCapability.MIP]
+    
     def get_solver_info(self) -> Dict[str, Any]:
         """Get cuOpt solver information"""
-        info = {
-            "name": "cuOpt with CLI-based MPS Support",
+        return {
+            "name": "cuOpt",
             "available": self.is_available(),
-            "capabilities": ["linear", "mixed-integer", "mps", "gpu-accelerated"]
+            "capabilities": [cap.value for cap in self.get_capabilities()]
         }
-        
-        if not self.is_available():
-            info["status"] = f"cuOpt CLI not available at {CUOPT_CLI_PATH}"
-        else:
-            try:
-                # Try to get version info
-                result = subprocess.run(
-                    [CUOPT_CLI_PATH, '--help'], 
-                    capture_output=True, 
-                    text=True, 
-                    timeout=5
-                )
-                info["status"] = "available"
-                info["cli_path"] = CUOPT_CLI_PATH
-            except Exception as e:
-                info["status"] = f"error: {str(e)}"
-        
-        return info
     
-    def solve_mps(self, mps_file_path: str, parameters: Dict[str, Any]) -> MPSOptimizationResponse:
+    def solve_mps(self, mps_file_path: str, parameters: Dict[str, Any], optimality_tolerance: Optional[float] = None) -> MPSOptimizationResponse:
         """
         Solve MPS file using cuOpt CLI
         

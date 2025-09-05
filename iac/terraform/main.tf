@@ -64,11 +64,191 @@ resource "aws_security_group" "rolex_sg" {
   #   cidr_blocks = ["0.0.0.0/0"]
   # }
 
-  # All outbound traffic
+  # Compliant outbound traffic - FASM approved ports only
+  
+  # ICMPv4 Type 8 (ping)
+  egress {
+    from_port   = 8
+    to_port     = 8
+    protocol    = "icmp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  
+  # TCP approved ports
+  egress {
+    from_port   = 53
+    to_port     = 53
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  
+  egress {
+    from_port   = 80
+    to_port     = 81
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  
+  egress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  
+  egress {
+    from_port   = 8080
+    to_port     = 8081
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  
+  egress {
+    from_port   = 1935
+    to_port     = 1936
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  
+  egress {
+    from_port   = 1438
+    to_port     = 1440
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  
+  egress {
+    from_port   = 1452
+    to_port     = 1452
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  
+  egress {
+    from_port   = 5060
+    to_port     = 5062
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  
+  egress {
+    from_port   = 9001
+    to_port     = 9008
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  
+  egress {
+    from_port   = 9003
+    to_port     = 9003
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  
+  egress {
+    from_port   = 9997
+    to_port     = 9997
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  
+  egress {
+    from_port   = 10100
+    to_port     = 10101
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  
+  egress {
+    from_port   = 15000
+    to_port     = 20999
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  
+  egress {
+    from_port   = 20100
+    to_port     = 20100
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  
+  egress {
+    from_port   = 65200
+    to_port     = 65535
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  
+  # UDP approved ports
+  egress {
+    from_port   = 53
+    to_port     = 53
+    protocol    = "udp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  
+  egress {
+    from_port   = 500
+    to_port     = 500
+    protocol    = "udp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  
+  egress {
+    from_port   = 1604
+    to_port     = 1604
+    protocol    = "udp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  
+  egress {
+    from_port   = 1719
+    to_port     = 1719
+    protocol    = "udp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  
+  egress {
+    from_port   = 4500
+    to_port     = 4500
+    protocol    = "udp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  
+  egress {
+    from_port   = 5060
+    to_port     = 5060
+    protocol    = "udp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  
+  egress {
+    from_port   = 36000
+    to_port     = 59999
+    protocol    = "udp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  
+  # IP protocols 47, 50, 51
   egress {
     from_port   = 0
     to_port     = 0
-    protocol    = "-1"
+    protocol    = "47"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "50"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "51"
     cidr_blocks = ["0.0.0.0/0"]
   }
 

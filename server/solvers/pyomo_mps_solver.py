@@ -23,7 +23,8 @@ except ImportError:
 
 from .mps_base import BaseMPSSolver
 from models import MPSOptimizationResponse, SolverDiagnostics, SolverCapability
-from .mps_to_pyomo_converter import MPSToPyomoConverter, get_model_info
+from .comprehensive_mps_parser import parse_mps_file
+from .mps_converters import to_pyomo, get_problem_info
 
 logger = logging.getLogger(__name__)
 
@@ -89,23 +90,16 @@ class PyomoMPSSolver(BaseMPSSolver):
             )
         
         try:
-            # Parse MPS file to Pyomo model using our converter
-            logger.info(f"Converting MPS file to Pyomo model: {mps_file_path}")
-            model = MPSToPyomoConverter.parse_mps_to_pyomo(mps_file_path)
+            # Parse MPS file using comprehensive parser and convert to Pyomo
+            logger.info(f"Parsing MPS file with comprehensive parser: {mps_file_path}")
             
-            if model is None:
-                return MPSOptimizationResponse(
-                    status="failed",
-                    message=f"Failed to convert MPS file to Pyomo model",
-                    solve_time=0.0,
-                    solver=self.name,
-                    solver_info=SolverDiagnostics(),
-                    parameters_used=parameters
-                )
+            mps_problem = parse_mps_file(mps_file_path)
+            problem_info = get_problem_info(mps_problem)
+            logger.info(f"Comprehensive parser: {problem_info['n_vars']} vars, {problem_info['n_constraints']} constraints, "
+                       f"quadratic: {problem_info['has_quadratic']}, integer: {problem_info['has_integer']}")
             
-            # Get model info for logging
-            model_info = get_model_info(model)
-            logger.info(f"{self.solver_name}: Model converted - {model_info['num_variables']} variables, {model_info['num_constraints']} constraints")
+            model = to_pyomo(mps_problem)
+            logger.info(f"{self.solver_name}: Using comprehensive parser - full MPS feature support")
             
             # Create solver instance
             solver = SolverFactory(self.solver_name)

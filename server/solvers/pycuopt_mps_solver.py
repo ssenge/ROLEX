@@ -11,7 +11,7 @@ import io
 from typing import Dict, Any, Optional, List
 
 from .mps_base import BaseMPSSolver
-from models import MPSOptimizationResponse, SolverDiagnostics, ConvergencePoint
+from models import MPSOptimizationResponse, SolverDiagnostics, ConvergencePoint, SolverCapability
 
 # Import dependencies with proper error handling
 try:
@@ -36,19 +36,19 @@ class PyCuOptMPSSolver(BaseMPSSolver):
     def is_available(self) -> bool:
         return CUOPT_AVAILABLE
 
-    def get_solver_info(self) -> Dict[str, Any]:
-        info = {
-            "name": "cuOpt with Python API",
-            "available": self.is_available(),
-            "capabilities": ["linear", "mixed-integer", "mps", "gpu-accelerated"]
-        }
-        if not CUOPT_AVAILABLE:
-            info["status"] = "cuOpt Python libraries not found"
-        else:
-            info["status"] = "available"
-        return info
+    def get_capabilities(self) -> List[SolverCapability]:
+        """pycuOpt can solve LP and MIP problems"""
+        return [SolverCapability.LP, SolverCapability.MIP]
 
-    def solve_mps(self, mps_file_path: str, parameters: Dict[str, Any]) -> MPSOptimizationResponse:
+    def get_solver_info(self) -> Dict[str, Any]:
+        """Get pycuOpt solver information"""
+        return {
+            "name": "pycuOpt",
+            "available": self.is_available(),
+            "capabilities": [cap.value for cap in self.get_capabilities()]
+        }
+
+    def solve_mps(self, mps_file_path: str, parameters: Dict[str, Any], optimality_tolerance: Optional[float] = None) -> MPSOptimizationResponse:
         if not self.is_available():
             raise RuntimeError("cuOpt Python API is not available")
 

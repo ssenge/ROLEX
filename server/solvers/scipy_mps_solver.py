@@ -8,6 +8,8 @@ import numpy as np
 
 from .mps_base import BaseMPSSolver
 from models import MPSOptimizationResponse, SolverDiagnostics, SolverCapability
+from .comprehensive_mps_parser import parse_mps_file
+from .mps_converters import to_scipy_matrices, get_problem_info
 
 logger = logging.getLogger(__name__)
 
@@ -231,8 +233,16 @@ class SciPyMPSSolver(BaseMPSSolver):
         logger.info(f"SciPy solver solving MPS file: {mps_file_path}")
         
         try:
-            # Parse MPS file
-            problem_data = self._parse_mps_file(mps_file_path)
+            # Parse MPS file using comprehensive parser
+            logger.info(f"Parsing MPS file with comprehensive parser: {mps_file_path}")
+            
+            mps_problem = parse_mps_file(mps_file_path)
+            problem_info = get_problem_info(mps_problem)
+            logger.info(f"Comprehensive parser: {problem_info['n_vars']} vars, {problem_info['n_constraints']} constraints, "
+                       f"quadratic: {problem_info['has_quadratic']}, integer: {problem_info['has_integer']}")
+            
+            # Convert to SciPy matrices
+            problem_data = to_scipy_matrices(mps_problem)
             
             # Set up parameters
             method = 'highs' if parameters and parameters.get('method') else 'highs'  # Default to HiGHS
@@ -243,7 +253,7 @@ class SciPyMPSSolver(BaseMPSSolver):
                 if 'verbose' in parameters and parameters['verbose']:
                     options['disp'] = True
             
-            logger.info(f"SciPy: Solving with {len(problem_data['var_names'])} variables, {problem_data['n_constraints']} constraints")
+            logger.info(f"SciPy: Solving with {problem_info['n_vars']} variables, {problem_info['n_constraints']} constraints")
             
             # Solve
             start_time = time.time()
@@ -265,7 +275,7 @@ class SciPyMPSSolver(BaseMPSSolver):
                     solver_status = "OPTIMAL"
                     objective_value = float(result.fun) if result.fun is not None else 0.0
                     variable_values = {
-                        problem_data['var_names'][i]: float(result.x[i])
+                        mps_problem.var_names[i]: float(result.x[i])
                         for i in range(len(result.x))
                     }
                     message = f"SciPy solved successfully using {method}"
@@ -295,7 +305,7 @@ class SciPyMPSSolver(BaseMPSSolver):
                 solve_time=solve_time,
                 solver=self.name,
                 solver_info=SolverDiagnostics(),
-                num_constraints=problem_data['n_constraints'],
+                num_constraints=problem_info['n_constraints'],
                 parameters_used=parameters or {}
             )
             

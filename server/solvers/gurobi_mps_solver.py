@@ -4,10 +4,10 @@ Native MPS file solving with Gurobi
 """
 import time
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional, TYPE_CHECKING, List
 
 from .mps_base import BaseMPSSolver
-from models import MPSOptimizationResponse, SolverDiagnostics
+from models import MPSOptimizationResponse, SolverDiagnostics, SolverCapability
 
 # Import dependencies with proper error handling
 try:
@@ -16,6 +16,14 @@ try:
     GUROBI_AVAILABLE = True
 except ImportError:
     GUROBI_AVAILABLE = False
+    gp = None
+    GRB = None
+
+# Type hints that work even when Gurobi is not available
+if TYPE_CHECKING or GUROBI_AVAILABLE:
+    from gurobipy import Model as GurobiModel
+else:
+    GurobiModel = object
 
 logger = logging.getLogger(__name__)
 
@@ -30,27 +38,31 @@ class GurobiMPSSolver(BaseMPSSolver):
         """Check if Gurobi is available"""
         return GUROBI_AVAILABLE
     
+    def get_capabilities(self) -> List[SolverCapability]:
+        """Gurobi can solve both LP and MIP problems"""
+        return [SolverCapability.LP, SolverCapability.MIP]
+    
     def get_solver_info(self) -> Dict[str, Any]:
         """Get Gurobi solver information"""
         info = {
-            "name": "Gurobi with Native MPS Support",
+            "name": "Gurobi",
             "available": self.is_available(),
-            "capabilities": ["linear", "quadratic", "mixed-integer", "mps"]
+            "capabilities": [cap.value for cap in self.get_capabilities()]
         }
         
-        if not GUROBI_AVAILABLE:
-            info["status"] = "Gurobi not available"
-        else:
+        # Add version if Gurobi is available
+        if self.is_available() and GUROBI_AVAILABLE:
             try:
-                # Get Gurobi version
+                import gurobipy as gp
                 info["version"] = f"{gp.gurobi.version()[0]}.{gp.gurobi.version()[1]}"
-                info["status"] = "available"
-            except Exception as e:
-                info["status"] = f"error: {str(e)}"
-        
+            except Exception:
+                info["version"] = "unknown"
+        else:
+            info["version"] = None
+            
         return info
     
-    def solve_mps(self, mps_file_path: str, parameters: Dict[str, Any]) -> MPSOptimizationResponse:
+    def solve_mps(self, mps_file_path: str, parameters: Dict[str, Any], optimality_tolerance: Optional[float] = None) -> MPSOptimizationResponse:
         """
         Solve MPS file using Gurobi
         
@@ -73,7 +85,7 @@ class GurobiMPSSolver(BaseMPSSolver):
             model = gp.read(mps_file_path)
             
             # Set parameters
-            self._set_gurobi_parameters(model, validated_params)
+            self._set_gurobi_parameters(model, validated_params, optimality_tolerance)
             
             # Data for convergence tracking
             convergence_data = []
@@ -145,7 +157,7 @@ class GurobiMPSSolver(BaseMPSSolver):
             logger.error(f"Gurobi MPS solve failed: {str(e)}")
             raise RuntimeError(f"Gurobi solve failed: {str(e)}")
     
-    def _set_gurobi_parameters(self, model: gp.Model, parameters: Dict[str, Any]):
+    def _set_gurobi_parameters(self, model: GurobiModel, parameters: Dict[str, Any], optimality_tolerance: Optional[float] = None):
         """Set Gurobi parameters from validated parameters"""
         
         if 'max_time' in parameters:
@@ -156,17 +168,23 @@ class GurobiMPSSolver(BaseMPSSolver):
             model.setParam('Threads', parameters['threads'])
             logger.info(f"Set Threads to {parameters['threads']}")
         
-        if 'gap_tolerance' in parameters:
-            model.setParam('MIPGap', parameters['gap_tolerance'])
-            logger.info(f"Set MIPGap to {parameters['gap_tolerance']}")
+        
         
         if 'verbose' in parameters:
             if parameters['verbose']:
                 model.setParam('OutputFlag', 1)
             else:
                 model.setParam('OutputFlag', 0)
+        
+        if optimality_tolerance is not None:
+            if model.IsMIP:
+                model.setParam('MIPGap', optimality_tolerance)
+                logger.info(f"Set MIPGap to {optimality_tolerance} (from optimality_tolerance)")
+            else:
+                model.setParam('OptimalityTol', optimality_tolerance)
+                logger.info(f"Set OptimalityTol to {optimality_tolerance} (from optimality_tolerance)")
     
-    def _process_gurobi_results(self, model: gp.Model, solve_time: float, parameters: Dict[str, Any]) -> MPSOptimizationResponse:
+    def _process_gurobi_results(self, model: GurobiModel, solve_time: float, parameters: Dict[str, Any]) -> MPSOptimizationResponse:
         """Process Gurobi optimization results"""
         
         # Map Gurobi status to our status

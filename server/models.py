@@ -39,6 +39,13 @@ class MPSSolverType(str, Enum):
     PYOMO_IPOPT = "pyomo-ipopt"
     PYOMO_SCIP = "pyomo-scip"
     PYOMO_HIGHS = "pyomo-highs"
+    CVXPY_CLARABEL = "cvxpy-clarabel"
+    CVXPY_OSQP = "cvxpy-osqp"
+    CVXPY_CVXOPT = "cvxpy-cvxopt"
+    CVXPY_SCS = "cvxpy-scs"
+    CVXPY_PROXQP = "cvxpy-proxqp"
+    CVXPY_ECOS = "cvxpy-ecos"
+    CVXPY_MOSEK = "cvxpy-mosek"
 
 
 class MPSOptimizationRequest(BaseModel):

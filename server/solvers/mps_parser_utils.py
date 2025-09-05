@@ -2,8 +2,14 @@ import logging
 import time
 from typing import Optional, Tuple
 
-import gurobipy as gp
-from gurobipy import GurobiError
+try:
+    import gurobipy as gp
+    from gurobipy import GurobiError
+    GUROBI_AVAILABLE = True
+except ImportError:
+    GUROBI_AVAILABLE = False
+    gp = None
+    GurobiError = Exception
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +24,10 @@ def get_mps_dimensions(mps_file_path: str) -> Tuple[Optional[int], Optional[int]
         A tuple containing (num_variables, num_constraints). Returns (None, None)
         if the file cannot be parsed or an error occurs.
     """
+    if not GUROBI_AVAILABLE:
+        logger.warning("Gurobi not available - cannot parse MPS dimensions")
+        return None, None
+        
     try:
         parse_start_time = time.time()
         model = gp.read(mps_file_path)
